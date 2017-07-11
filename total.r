@@ -13,20 +13,36 @@ print(Sys.time())
 ## save(lin,jagsDatReal,file=paste0('~/Google Drive/CTmodels/realModels/lin',Sys.Date(),'.RData'))
 ## rm(lin);gc()
 
+
+
 #### robustness checks
+
+## box-cox transformed outcomes
 print(Sys.time())
-datBC <- dat
-rawdat <- read.csv('../../data/RANDstudyData/H2_algebra_rcal_20121119_fieldid.csv')
-datBC$Y <- vapply(datBC$field_id, function(id) rawdat$t2score[rawdat$field_id==id]+1,1)
-jagsDatBC <- makeJagsDat(datBC,advance)
-trans <- with(jagsDatBC,MASS::boxcox(Y[Z==1]~X[Z==1,]+U))
+trans <- with(jagsDatReal,MASS::boxcox(Y[Z==1]+1.8~X[Z==1,]+U))
 lambda <- trans$x[which.max(trans$y)]
+jagsDatBC <- jagsDatReal
 if(lambda !=0) jagsDatBC$Y <- (jagsDatBC$Y^lambda-1)/lambda else jagsDatBC$Y <- log(jagsDatBC$Y)
-bc <- jags.parallel(jagsDatBC,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=10000,n.thin=5)
+bc <- jags.parallel(jagsDatRAW,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=10000,n.thin=5)
+save(bc,jagsDatBC,lambda,trans,file=paste0('~/Google Drive/CTmodels/realModels/bc',Sys.Date(),'.RData'))
+rm(bc);gc()
 print(Sys.time())
 
-save(bc,jagsDatReal,file=paste0('~/Google Drive/CTmodels/realModels/bc',Sys.Date(),'.RData'))
-rm(bc);gc()
+
+#### raw outcomes
+print(Sys.time())
+datRAW <- dat
+rawdat <- read.csv('../../data/RANDstudyData/H2_algebra_rcal_20121119_fieldid.csv')
+datRAW$Y <- vapply(datRAW$field_id, function(id) rawdat$t2score[rawdat$field_id==id]+1,1)
+jagsDatRAW <- makeJagsDat(datRAW,advance)
+trans <- with(jagsDatRAW,MASS::boxcox(Y[Z==1]~X[Z==1,]+U))
+lambda <- trans$x[which.max(trans$y)]
+if(lambda !=0) jagsDatRAW$Y <- (jagsDatRAW$Y^lambda-1)/lambda else jagsDatRAW$Y <- log(jagsDatRAW$Y)
+raw <- jags.parallel(jagsDatRAW,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=10000,n.thin=5)
+print(Sys.time())
+
+save(raw,jagsDatRAW,trans,lambda,file=paste0('~/Google Drive/CTmodels/realModels/raw',Sys.Date(),'.RData'))
+rm(raw);gc()
 
 
 

@@ -5,7 +5,7 @@ library(R2jags)
 memory.limit(50000)
 
 #save(list=ls(),file=paste0('prev',Sys.time(),'.RData'))
-#rm(list=ls())
+rm(list=ls())
 
 load('../../data/RANDstudyData/HSdata.RData')
 load('../../data/sectionLevelUsageData/advanceData.RData')
