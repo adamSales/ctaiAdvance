@@ -1,0 +1,38 @@
+model{
+ ## measurement model
+ for(sw in 1:nsecWorked){
+  grad[sw] ~ dbern(prob[sw])
+  prob[sw] <- 1/(1+exp(-linPred[sw]))
+  linPred[sw] <- studEff[studentM[sw]]+secEff[section[sw]]
+ }
+ sdSeff <- sd(studEff[])
+ avgSeff <- mean(studEff[])
+ for(i in 1:nstud){
+  ### Usage
+  studEff[i] ~ dnorm(muU[i],tauU)
+  muU[i] <- X[i,]%*%betaU+teacherEffU[teacher[i]]
+
+ }
+ for(tch in 1:ntch){
+  teacherEffU[tch]~dnorm(schoolEffU[school[tch]],tauTchU)
+ }
+ for(scl in 1:nscl){
+  schoolEffU[scl]~dnorm(0,tauSclU)
+ }
+
+ ### priors
+ for(covar in 1:ncovar){
+  betaU[covar]~dnorm(0,1/3)
+ }
+
+ for(sec in 1:nsec){
+  secEff[sec]~dnorm(0,1/100)
+ }
+
+ tauU~dgamma(0.001,0.001)
+ sig2U <- 1/tauU
+ tauTchU~dgamma(0.001,0.001)
+ sig2TchU <- 1/tauTchU
+ tauSclU~dgamma(0.001,0.001)
+ sig2SclU <- 1/tauSclU
+}

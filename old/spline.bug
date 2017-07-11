@@ -1,0 +1,24 @@
+model{
+ for(i in 1:N){
+  y[i] ~ dnorm(mu[i],tau)
+  mu[i] <- inprod(x[i,],beta)+inprod(z[i,],u)
+ }
+ for(l in 1:(degree+1)){
+  beta[l]~dnorm(0,1/1000)
+ }
+ for(k in 1:nknots){
+  u[k]~dnorm(0,tauu)
+ }
+ tauu~dgamma(0.001,0.001)
+ tau~dgamma(0.001,0.001)
+
+ for(ii in 1:N){
+  for(ll in 1:(degree+1)){
+   x[ii,ll]<-pow(covariate[ii],ll-1)
+  }
+  for(kk in 1:nknots){
+   uu[ii,kk]<-(covariate[ii]-knot[kk])*step(covariate[ii]-knot[kk])
+   z[ii,kk] <- pow(uu[ii,kk],degree)
+  }
+ }
+}

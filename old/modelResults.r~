@@ -1,0 +1,25 @@
+library(R2jags)
+library(jagstools)
+
+fittedModels <- list.files('fittedModels')
+
+
+sink('TreatmentEstimates.txt')
+pdf('TreatmentEstimates.pdf')
+
+
+cat('Effect Estimates from Various Models\n\n')
+cat('-----------------------------------\n\n\n\n')
+
+for(modFile in fittedModels){
+    cat(modFile,'\n\n')
+    modName <- load(paste0('fittedModels/',modFile))
+    mod <- get(modName)
+    rm(list=modName)
+
+    trtMod <- mod4$model$model()[which((grepl('trtEff' ,mod4$model$model())*
+                                !grepl('betaY' ,mod4$model$model()))==1)]
+
+    cat('Treatment Model: ',trtMod,'\n\n')
+    cat('Estimates:\n')
+    print(jagsresults(mod,c('b0','b1','b2','ab')))

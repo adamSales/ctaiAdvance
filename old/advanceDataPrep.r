@@ -1,0 +1,96 @@
+library(kimisc) # for nlist()
+### sets up the data for the advance model
+## first run advanceDataCleaning.r to load and clean the data
+
+## then this function
+
+
+makeData <- function(dat,advance,jags=TRUE){
+
+    complied <- advance$complied
+    sectionAdv <- as.numeric(factor(advance$section))
+
+    UNIT <- vapply(unique(sectionAdv),function(sec) advance$unit.y[sectionAdv==sec][1],1)
+    UNIT <- as.numeric(as.factor(UNIT))
+    nunit <- max(UNIT)
+
+
+### match up student ids in dat to those in advance.
+    dat <- dat[order(dat$field_id),]
+    ids <- as.numeric(as.factor(dat$field_id))
+
+
+### wanted to make sure I was getting this right, did it two ways
+                                        #advID2 <- vapply(advance$field_id,function(id) ids[dat$field_id==id],1)
+    advID <- match(advance$field_id,dat$field_id)
+                                        #> all(advID2==advID)
+                                        #[1] TRUE
+
+    stopifnot(max(sectionAdv)==length(unique(advance$section)))
+    nsec <- max(sectionAdv)
+
+    Nadv <- nrow(advance)
+
+
+    dat$state <- relevel(dat$state,ref=levels(dat$state)[which.max(table(dat$state))])
+
+    ## covariates
+    ## note: 9/30 I randomly decided to be scrupulous about measurement error in covariates
+    ## state, grade, race, sex, spec, esl, frl have little measurement error, missing data
+    ## filled in missing data w/ missForest call it good.
+    ## we will put an explicit model for pretest in the jags code--this will both take care
+    ## of measurement error and multiply impute missing pretest values. This is basically what
+    ## Dan et al. did in the original study, just Bayesian like.
+    ## I took out lagged test scores cuz they had tons of missingness and who knows about ME
+    X <- model.matrix(rep(1,nrow(dat))~state+I(grade==9)+race+sex+spec+esl+frl,data=dat)
+    pretest <- dat$xirtOrig
+    xirtImp <- dat$xirt # missForest imputed
+
+
+
+
+### match matrix (dummy variables)
+    pairMat <- model.matrix(rep(1,nrow(dat))~pair,data=dat)[,-1]
+
+
+
+### teacher, school, and match levels
+    teacher <- as.numeric(droplevels(dat$teachid2))
+    nteachers <- max(teacher)
+    dat$school <- as.numeric(as.factor(as.character(dat$schoolid2)))
+    school <- vapply(unique(teacher),function(teach) dat$school[teacher==teach][1],1)
+    nschools <- length(unique(school))
+
+    ncov <- ncol(X)
+    N <- nrow(X)
+
+
+### treatment and outcome
+    Y <- dat$Y
+    Z <- dat$treatment
+
+    xPrec <- 1/dat$xirt_sem^2
+    xPrec[is.na(xPrec)] <- mean(xPrec) ### fix later?
+    obs <- !is.na(pretest)
+
+    jags.dat <- nlist(Nadv,complied,advID,sectionAdv,nsec,UNIT,nunit,X,teacher,nteachers,
+                      nschools,N,ncov,school,pretest,xPrec,obs,Y,Z)
+
+    if(jags) return(jags.dat)
+
+### for stan measurement/imputing:
+    pretestObs <- pretest[!is.na(pretest)]
+    xsem <- dat$xirt_sem[!is.na(pretest)]
+    obs <- seq(N)[!is.na(pretest)]
+    Nobs <- length(obs)
+
+
+
+    stanDat <- list()
+    for(obj in jags.dat) stanDat[[obj]] <- get(obj)
+
+
+    invisible(stanDat)
+}
+
+

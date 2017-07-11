@@ -1,0 +1,29 @@
+
+jagsDat <- c('nsecWorked','grad','studentM','section','X','teacher','Z','Xm','school','nstud','Y','ntch','nscl','nsec','unit','nunit','ncovar','npair','pair','knot','nknots','knotx','nstuobs','nclass','cid','sidX','xirt','precme','vargroup','nvg')
+jagsDat <- sapply(jagsDat,get,simplify=FALSE,USE.NAMES=TRUE)
+
+params <- c('prob','studEff','secEff','alphaU','betaU','classEffU','schoolEffU','Ynew','tauY','useEff','trtEff','betaY','classEffY','classEffX','schoolEffY','Ustd','a0','a1','a2','b0','b1','b2','tauClsU','tauClsY','tauSclU','tauSclY','tauSec','tauUn','tauU','sigU','sigY','sigClsU','sigClsY','sigClsX','sigSclU','sigSclY','siguu','bu','bt','uu','ut','u','betaX','sdstu','uxu','uxy','siguuxy','siguuxu','secEff','pairEffect')
+
+### for(kkk in 1:5){
+###     print(kkk)
+###     nknots <- kkk
+###     knot <- makeKnots(kkk)
+###     print(Sys.time())
+###     mod <- jags(jagsDat,parameters=params,model.file='src/psmodLinSpline.bug',n.chains=4,n.iter=4000,n.thin=4)
+###     save(mod,file=paste0('splineMod',kkk,'.RData'))
+###     rm(mod); gc()
+### }
+
+
+xirt <- dat$xirt
+
+
+nknots <- 5
+knot <- makeKnots(nknots)
+knotx <- makeKnots(nknots)
+print(Sys.time())
+mod <- jags(jagsDat,parameters=params,model.file='src/psmodLinSpline.bug',n.chains=4,n.iter=4000,n.thin=4)
+#update(mod,n.iter=4000)
+save(mod,jagsDat,file=paste0('splineMod',kkk,Sys.Date(),'.RData'))
+print(Sys.time())
+

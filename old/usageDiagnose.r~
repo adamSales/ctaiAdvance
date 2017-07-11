@@ -1,0 +1,35 @@
+library(lme4)
+library(parallelsugar)
+if(exists('.Random.seed')) rm(.Random.seed)
+
+library(arm)
+load('~/Box Sync/CT/data/sectionLevelUsageData/advanceDatawInfo.RData')
+
+### look at promotion
+### delete "CP" sections. Logic: these are missing data, since we don't get to see if student
+### would have graduated. Student random effects calculated using observed sections. FIML?
+advance <- droplevels(subset(advance, status%in%c('graduated','promoted')))
+
+### just look at algebra I sections--- likely different advance patterns in other curricula
+### make sure to keep algebra i units that are also part of other curricula
+algUnit <- unique(advance$unit[advance$curriculum=='algebra i'])
+advance <- subset(advance,unit%in%algUnit)
+
+advance$grad <- advance$status=='graduated'
+
+load('lpm.RData')
+
+X <- model.matrix(mod2)
+predEf <- function(id,mod) X[id,]%*%fixef(mod)
+
+
+ids <- advance[rownames(X),]$field_id
+Xstud <- aggregate(X,by=list(id=ids),FUN=function(x) x[1])
+rownames(Xstud) <- Xstud$id
+Xstud <- as.matrix(Xstud[,-1])
+
+predEf <- function(id,mod) Xstud[id,]%*%fixef(mod)
+
+
+
+bigSchools <- levels(advance$schoolid2)[which(table(advance$schoolid2)>1000)]

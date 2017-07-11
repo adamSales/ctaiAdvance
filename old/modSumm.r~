@@ -1,0 +1,28 @@
+library(R2jags)
+library(jagstools)
+
+source('src/jagsSims.r')
+
+sims <- goodList(mod$BUGSoutput$sims.array,mod$parameters)
+
+
+######### Convergence
+
+smallVars <- names(sims)[sapply(sims,ncol)<20]
+#trtpVars <- setdiff(trptVars,highD)
+R2jags::traceplot(mod,var=smallVars,ask=TRUE)
+
+jagsresults(mod,smallVars)
+
+par(mfrow=c(3,4))
+for(varb in setdiff(names(mod$BUGSoutput$sims.list),trptVars)){
+    print(varb)
+    x <- jagsresults(mod,varb)
+    hist(x[,'Rhat'],main=varb)
+}
+
+
+
+
+
+

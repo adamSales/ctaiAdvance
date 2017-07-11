@@ -1,0 +1,50 @@
+model{
+
+ for(adv in Nadv){
+  complied[adv]~ dbern(prob[adv])
+  logit(prob[adv]) <- ability[advID[adv]]+diff[sectionAdv[adv]]+avgAb
+ }
+ for(sec in 1:nsec){
+  diff[sec] ~ dnorm(unitEffect[UNIT[sec]],tauSec)
+ }
+ for(u in 1:nunit){
+  unitEffect[u]~ dnorm(0,tauU)
+ }
+
+ for(i in 1:N){
+  muAb[i] <- X[i,]%*%betaAb+teacherEffectAb[teacher[i]]+bx*pretest[i]
+  muPre[i] = X[i,]%*%betaPre+teacherEffectPre[teacher[i]]
+
+  ability[i]~dnorm(muAb[i],tauAb)
+
+  pretest[i]~dnorm(muPre[i],ifelse(obs[i],xPrec[i],tauPre))
+
+ }
+ for(tch in 1:nteachers){
+  teacherEffectAb[tch]~dnorm(schoolEffectAb[school[tch]],tauTeachAb)
+  teacherEffectPre[tch]~dnorm(schoolEffectPre[school[tch]],tauTeachPre)
+ }
+ for(sch in 1:nschools){
+  schoolEffectAb[sch]~dnorm(0,tauSchoolAb)
+  schoolEffectPre[sch]~dnorm(0,tauSchoolPre)
+ }
+
+ avgAb~dnorm(0,1/10)
+
+ betaAb[1]~dnorm(0,1/10)
+ betaPre[1]~dnorm(0,1/10)
+ for(pp in 2:ncov){
+  betaAb[pp]~dnorm(0,1)
+  betaPre[pp]~dnorm(0,1)
+ }
+ bx~dnorm(0,1)
+
+ tauPre~dgamma(0.001,0.001)
+ tauSec~dgamma(0.001,0.001)
+ tauU~dgamma(0.001,0.001)
+ tauAb~dgamma(0.001,0.001)
+ tauTeachAb~dgamma(0.001,0.001)
+ tauTeachPre~dgamma(0.001,0.001)
+ tauSchoolAb~dgamma(0.001,0.001)
+ tauSchoolPre~dgamma(0.001,0.001)
+}

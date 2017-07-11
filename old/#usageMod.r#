@@ -1,0 +1,15 @@
+library(Hmisc)
+library(jagstools)
+
+load('~/Google Drive/CTmodels/realModels2017-06-15.RData')
+
+coefs <- jagsresults(realModels$lin,'betaU')
+
+X2 <- model.matrix(~poly(xirt,2)+race+sex+spec+state,data=dat)[,-1]
+
+coefs <- coefs/apply(X2,2,sd)/sqrt(mean(apply(studEff,1,var)))
+
+errbar(x=c('Black/Multiracial','Hispanic/Native American','Male','Special Ed.','Gifted'),coefs[3:7,1],coefs[3:7,'2.5%'],coefs[3:7,'97.5%'])
+abline(v=0,lty=2)
+
+### raw beta= diff

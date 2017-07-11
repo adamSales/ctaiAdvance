@@ -1,0 +1,386 @@
+## regression calibration estimates of IRT pre-score
+## r1: added indicator for grade 8 to HS model because there are 8th graders in HS classes
+## r2: mary's modifications
+## rcal-plugjags-r0: uses new data, adds jags code to impute plausible values, runs xtmixed
+##    NOTE: eliminated "sexMIS" from model because it is nearly collinear with "specMIS" and
+##    exactly so in one cell.
+##    NOTE: restricted procedures to cases with observed xirt and yirt; see explanation below
+##    NOTE: in imputation, need to include "yirt" on RHS to maintain correlation with yirt.
+##
+####################################################################################
+## (1/9/2012) updated to merge imputations onto the full dataset to give to BA,
+## and also calculate school aggregates of student variables
+####################################################################################
+
+####################################################################################
+## (2/20/2012) updated to use the new data, which includes more demographics and
+## also includes FRL.  worked with john to set up new conventions for covariates:
+##
+##The derived variables are:
+## x_specMIS    : int
+## x_spec_speced: num
+## x_giftedMIS  : int
+## x_spec_gifted: num
+## x_eslMIS     : int
+## x_spec_esl   : num
+## x_gradeMIS   : int
+## x_grade6     : num
+## x_grade7     : num
+## x_grade8     : num
+## x_grade9     : num
+## x_grade10    : num
+## x_grade11    : num
+## x_grade12    : num
+## x_raceMIS    : int
+## x_racewhite  : num
+## x_raceblack  : num
+## x_racehisp   : num
+## x_raceasian  : num
+## x_raceother  : num
+## x_sexMIS     : int
+## x_sexM       : num
+## x_frlMIS     : int
+## x_frl        : num
+## x_xirtMIS    : int
+## x_xirt       : num
+####################################################################################
+
+####################################################################################
+## (11/2/2012) updated to use latest data which includes survey outcomes and state pre-tests
+##
+## changed code to use schoolid2 rather than schoolidn
+## used tmpdirs and thinning for JAGS, increased iterations to 4000
+## added six survey variables and their missingness indicator into the imputations as covariates
+## streamlined JAGS code to allow flexible number of covariates, consolidates EU1 and EU2
+## added lagged scores and interactions as needed to imputations, including allowing FH variance
+##  to depend on pattern (vargroup).  this isn't possible with my base FH function so the non-JAGS reg calibration
+##  estimates should be considered suspect
+####################################################################################
+
+####################################################################################
+## 11/7/2012:
+##
+## eliminated the likelihood rcal point estimates
+## eliminated the "simpler" (Exirt1) imputations
+## expanded the analysis sample to include cases with yirt observed, whether or not xirt observed,
+##   changing the JAGS code to just loop over observed xirt cases for the measurement model
+## tightened priors in imputation to better handle missing xirt cases
+## adopted stricter criteria for including grade/missing indicators among eligible variables
+##   because some of these were poorly identified among kids missing xirt
+####################################################################################
+
+####################################################################################
+## 11/16/2012-11/18/2012
+##
+## uses new 4-datafile format from john that restricts to only observed yirt
+## cases and relevant grades within each cell and has the fully expanded x
+## variables that involve the lag scores
+##
+## eliminated a lot of legacy code
+##
+## collapsed vargroups that had 10 or fewer students with xirt observed
+####################################################################################
+library(coda)
+library(R2WinBUGS)
+
+datadir <- "~/Projects/2011-pane/data/4files-16nov2012/"
+csvfile <- "~/Projects/2011-pane/rcal-plusimputations-18nov2012.csv"
+objfile <- "~/Projects/2011-pane/rcal-plusimputations-18nov2012.Robj"
+plotfile <- "~/Projects/2011-pane/rcal-plusimputations-18nov2012.ps"
+derivedd <- "~/Projects/2011-pane/rcal-plusimputations-18nov2012d.Robj"
+
+set.seed(4036)
+seeds <- round(10000*runif(100), digits=0)
+seedcount <- 1
+
+#################################################
+## DATA PREP
+#################################################
+docell <- vector(4, mode="list")
+names(docell) <- cohort.order <- c("H1","H2","M1","M2")
+
+## loop over files
+for(i in 1:4){
+  cat(paste("\n##################", cohort.order[i], "######################\n\n"))
+  d <- read.csv(gzfile(paste(datadir, cohort.order[i], "_algebra_20121116.csv.gz", sep="")), stringsAsFactors=FALSE, colClasses=c(teachid2="character",classid2="character",schoolidn="character",randid2="character"), na="NA")
+  print(nrow(d))
+  stopifnot(lu(d$cell) == 1)
+  d <- d[,setdiff(names(d), c("classid","randid","teachid"))]
+  d$index <- 1:nrow(d)
+
+  ## get rid of "." in names
+  names(d) <- gsub(".", "m", names(d), fixed=TRUE)
+
+  ## drop x_pair variables because we use the finer classid2
+  w <- names(d)[grep("x_pair", names(d))]
+  d <- d[,setdiff(names(d), w)]
+
+  ## make sure classid is the finest level of grouping and one record per student * cohort
+  ## make sure schoolid2 == schoolidn
+  stopifnot(lu(d$schoolid2) == nrow(unique(d[,c("schoolid2","schoolidn")])))
+  d$schoolidn <- NULL
+  stopifnot(lu(d$classid2) == nrow(unique(d[,c("classid2","state","year","schoolid2","grdlvl","teachid2","treatment","pair")])))
+  stopifnot(lu(d$iy) == nrow(d))
+
+  ## checks on survey variables
+  survvars <- c("y_sv_mathutil","y_sv_mathconf","y_sv_techconf","y_sv_techutil","y_sv_clasopin","y_sv_schlplan")
+  stopifnot(all(survvars %in% names(d)))
+  tmp <- subset(d, y_svMIS==1)
+  stopifnot(all(tmp[,survvars] == 0))
+
+  ## is xirt_sem observed whenever xirt is?
+  stopifnot(all(!is.na(d$xirt_sem[d$x_xirtMIS==0])))
+
+  ## ADDED 11/7/2012: we cannot use class fixed effects in cases where there are
+  ## no observed xirt cases.  we should also probably not use them in cases where
+  ## there are only a single observed xirt case.  so we create "classid3" which
+  ## collapses all of these classes into a single one for the purpose of the
+  ## imputations.
+  ## NOTE: even with 1 there seemed to be identifiability problems so move threshold to 2
+  d$count <- ave(1-d$x_xirtMIS, d$classid2, FUN=sum)
+  tmp <- unique(d[,c("classid2","count")])
+  tmp <- tmp[order(tmp$count),]
+  print(subset(tmp, count <= 2))
+  d$classid3 <- d$classid2
+  stopifnot(sum(d$classid2 == "C99999999") == 0)
+  d$classid3[which(d$count <= 2)] <- "C99999999"
+  print(c(lu(d$classid2), lu(d$classid3)))
+
+  ## email 11/17/2012: john said "lag_gp" can serve as vargroup (different FH variances)
+  ## but found in initial runs that students with wacky imputations came from vargroups
+  ## with small number of xirt-observed students, so we collapse these
+  d$countv <- ave(1-d$x_xirtMIS, d$lag_gp, FUN=sum)
+  print(subset(unique(d[,c("lag_gp","countv")]), countv <= 10))
+  d$lag_gp[which(d$countv <= 10)] <- "_collapsed"
+  d$vargroup <- as.numeric(as.factor(d$lag_gp))
+  d$countv <- ave(rep(1, nrow(d)), d$lag_gp, FUN=sum)
+  tmp <- unique(d[,c("vargroup","lag_gp","countv")])
+  print(tmp[order(tmp$vargroup),])
+  d$countv <- NULL
+
+  ## assign the list element
+  docell[[i]] <- d
+}
+
+save(docell, file=derivedd, compress=TRUE)
+
+########################################################################
+## figuring out which covariate configurations can be used in each cell
+########################################################################
+svars <- lapply(docell, function(x){
+  n1 <- names(x)[grep("y_", names(x))]
+  n2 <- names(x)[grep("x_", names(x))]
+  setdiff(c(n1, n2), c("x_xirt","x_xirtMIS")) ## NOTE: i think using x_xirtMIS in the model is like allowing MNAR so we eliminate
+})
+
+todrop <- vector(length(svars), mode="list")
+names(todrop) <- names(svars)
+
+for(w in cohort.order){
+  cat(paste("\n\n#############",w,"############\n\n"))
+  tmp <- docell[[w]]
+  Xc <- model.matrix(~as.factor(classid3) - 1, data=tmp)
+  Xs <- model.matrix(as.formula(paste("~", paste(svars[[w]], collapse=" + "),"-1")), data=tmp)
+  Xboth <- cbind(Xc, Xs)
+  print(c(qr(Xc)$rank, ncol(Xc)))
+  print(c(qr(Xs)$rank, ncol(Xs)))
+  print(c(qr(Xboth)$rank, ncol(Xboth)))
+  ## print(apply(Xs, 2, sum))
+  tmp$dummy <- rnorm(nrow(tmp))
+  m <- lm(tmp$dummy ~ Xboth - 1)
+  null <- gsub("Xboth","", names(coef(m)[is.na(coef(m))]))
+  stopifnot(all(null %in% svars[[w]]))
+  todrop[[w]] <- null
+}
+
+print(todrop)
+.n <- sapply(svars, l)
+svars <- mapply(setdiff, svars, todrop, SIMPLIFY=FALSE)
+print(cbind(.n, sapply(svars, l)))
+
+######################################
+## JAGS code to fit FH model by cell and generate plausible values
+## Exirt2 (class fixed effects plus student covariates)
+######################################
+nkeep <- 20
+tmpdir <- paste(tempdir(),"/",sep="")
+setwd(tmpdir)
+
+jagsit <- function(s, xvars, stem){
+  cat(paste("\n\n##############################################################\n"))
+  cat(paste("############",su(s$cell), stem,"#################\n"))
+  print(xvars)
+  nx <- length(xvars)
+  nvargroup <- lu(s$vargroup)
+  stopifnot(all(xvars %in% names(s)))
+
+  ## WRITE THE MODEL FILE
+  cat("model\n{\nfor(i in 1:nstu){\n   u[i]  ~ dnorm(0, precstu[vargroup[i]])\n", file="model.txt",sep='')
+  cat(paste("   theta[i] <- mu[cid[i]] + ",  paste(sapply(1:nx, function(x){ paste("beta[",x,"]*X[i,",x,"]",sep="")}), collapse=" + "),"+ u[i]\n}\n\n"), file="model.txt", append=TRUE,sep='')
+  cat("for(i in 1:nstuobs){\n  xirt[i] ~ dnorm(theta[sid[i]], precme[i])\n}\n\n", file="model.txt", append=TRUE,sep='')
+  cat("\nfor(i in 1:nclass){\n   mu[i] ~ dnorm(0, 0.1)\n}\n\n",file="model.txt", append=TRUE,sep='')
+  cat(paste("for(i in 1:",nx,"){\n   beta[i] ~ dnorm(0, 0.1)\n}\n\n",sep=""), file="model.txt", append=TRUE,sep='')
+  cat(paste("for(i in 1:",nvargroup,"){\n  sdstu[i] ~ dunif(0,1)\n  varstu[i] <- sdstu[i]*sdstu[i]\n  precstu[i] <- 1/varstu[i]\n}\n}\n",sep=""), file="model.txt", append=TRUE,sep='')
+
+  ## WRITE DATA FILE
+  s$sid <- 1:nrow(s)
+  nstu <- nrow(s)
+  nclass <- lu(s$classid3)
+  cid <- s$cid <- as.numeric(as.factor(s$classid3))
+  X <- as.matrix(s[,xvars])
+  stopifnot(nmis(c(X)) == 0)
+
+  tmp <- subset(s, !is.na(xirt))
+  nstuobs <- nrow(tmp)
+  sid <- tmp$sid
+  xirt <- tmp$xirt
+  precme <- 1 / (tmp$xirt_sem^2)
+
+  vargroup <- s$vargroup
+  dump(c("nstu","nstuobs","nclass","cid","sid","X","xirt","precme","vargroup"), file = "data.txt")
+
+  ## WRITE INITS FILES (2 chains)
+  gen.inits <- function(i, seed){
+    .tmp <- list(u     = rnorm(nstu,sd=0.5),
+                 mu    = rnorm(nclass,sd=0.2),
+                 beta  = rnorm(nx,sd=0.2),
+                 sdstu = runif(nvargroup),
+                 .RNG.name = "base::Mersenne-Twister",
+                 .RNG.seed = seed)
+
+    attach(.tmp)
+    dump(names(.tmp), paste(tmpdir,"inits",i,".txt",sep=""))
+    detach(.tmp)
+  }
+  gen.inits(1, seeds[seedcount]); seedcount <- seedcount + 1
+  gen.inits(2, seeds[seedcount]); seedcount <- seedcount + 1
+
+  ## WRITE SCRIPT FILE
+  cat("model in 'model.txt'
+data in 'data.txt'
+compile, nchains(2)
+parameters in 'inits1.txt', chain(1)
+parameters in 'inits2.txt', chain(2)
+initialize
+update 10000, by (20)
+monitor set theta, thin(20)
+update 10000, by (20)
+coda *, stem(eu)\n\n", file = "script.txt")
+
+  ## RUN THE MODEL AND PULL IN OUTPUT
+  system("jags script.txt")
+  r1 <- read.coda("euchain1.txt", "euindex.txt", quiet=TRUE)
+  r2 <- read.coda("euchain2.txt", "euindex.txt", quiet=TRUE)
+
+  ## GR diagnostic on plausible values
+  gr <- lapply(1:ncol(r1), function(i){ gelman.diag(mcmc.list(r1[,i],r2[,i]))$psrf })
+  gr <- as.data.frame(do.call("rbind", gr))
+  names(gr) <- c("gr.est","gr.upper")
+  gr$xirtstatus <- ifelse(!is.na(s$xirt),"obs","mis")
+  cat("\n\nPARAMETERS WITH HIGH GR\n")
+  print(subset(gr, gr.est >= 1.10), digits=4)
+
+  ## collect results including posterior mean and "nkeep" plausible values
+  r  <- rbind(r1, r2)
+  stopifnot(nrow(s) == ncol(r))
+  w1 <- which(!is.na(s$xirt))
+  w0 <- which(is.na(s$xirt))
+  print(summary(cor(t(r[,w1]), xirt)))
+  print(summary(cor(t(r[,w1]), s$y_yirt[w1])))
+  print(summary(cor(t(r[,w0]), s$y_yirt[w0])))
+  ## imputations should be more variable among xirt missing cases
+  print(summary(apply(r[,w1], 2, var)))
+  print(summary(apply(r[,w0], 2, var)))
+
+  s[,paste(stem,"jags",sep="_")] <- as.vector(apply(r, 2, mean))
+  plaus <- t(r[round(seq(from=1, to=nrow(r), length=nkeep),digits=0),])
+  colnames(plaus) <- paste(stem,lex(nkeep),sep="_")
+  return(data.frame(s[,c("iy",paste(stem,"jags",sep="_"))], plaus))
+}
+
+##############################################################
+## run imputation by cell by model
+##############################################################
+jags2 <- do.call("rbind", mapply(jagsit, docell, svars, as.list(rep("Exirt2",4)), SIMPLIFY=FALSE))
+jags2 <- jags2[order(jags2$iy),]
+rownames(jags2) <- 1:nrow(jags2)
+
+#####################################################################
+## consolidate pieces and save
+#####################################################################
+do <- do.call("rbind", lapply(docell, function(x){ x[,c("cell","classid3","count","iy","y_yirt","xirt","x_spec_gifted","x_frl","x_sexM","x_raceblack","x_racehisp","treatment")]}))
+
+## stopifnot(identical(rc$iy, jags1$iy) && identical(rc$iy, jags2$iy) && identical(su(rc$iy), su(do$iy)))
+stopifnot(identical(su(jags2$iy), su(do$iy)))
+## r <- data.frame(rc, jags1[-1], jags2[-1])
+r <- jags2
+stopifnot(all(sapply(r, pobs) == 1))
+## rm(rc, jags1, jags2)
+rm(jags2)
+tokeep <- setdiff(names(r), "Exirt2_jags")
+r <- r[order(r$iy),]
+
+## set missing values of r.c. and all imputations to 0.0
+## for(v in setdiff(names(r), c("iy"))){
+##   d[which(is.na(d[,v])),v] <- 0.0
+## }
+
+##################
+## diagnostics - merge imputations onto "do"
+##################
+stopifnot(all(intersect(names(do), names(r)) == "iy"))
+stopifnot(all(r$iy %in% do$iy))
+print(c(.n <- nrow(do), nrow(r)))
+do <- merge(do, r, by="iy", all.x=TRUE)
+stopifnot(nrow(do) == .n)
+do <- do[order(do$iy),]
+
+v <- setdiff(names(r), c("iy","y_yirt"))
+print(cor(do[,v], do$xirt, use="c"))
+print(cor(do[,v], do$y_yirt))
+
+tmp <- subset(do, !is.na(xirt))
+print(nrow(tmp))
+print(cor(tmp[,v], tmp$xirt))
+print(cor(tmp[,v], tmp$y_yirt))
+
+tmp <- subset(do, is.na(xirt))
+print(nrow(tmp))
+print(cor(tmp[,v], tmp$y_yirt))
+
+postscript(plotfile)
+par(mfrow=c(2,2), oma=c(0,0,3,0))
+for(w in cohort.order){
+  tmp0 <- subset(do, cell==w & is.na(xirt))
+  tmp1 <- subset(do, cell==w & !is.na(xirt))
+  plot(tmp0$Exirt2_01, tmp0$y_yirt, xlab="impute (xirt missing)", ylab="y_yirt"); abline(0,1)
+  plot(tmp1$Exirt2_01, tmp1$y_yirt, xlab="impute (xirt obs)", ylab="y_yirt"); abline(0,1)
+  plot(tmp1$Exirt2_01, tmp1$xirt, xlab="impute (xirt obs)", ylab="xirt"); abline(0,1)
+  plot.new()
+  title(main=w, outer=TRUE)
+}
+dev.off()
+
+tmp <- subset(do, !is.na(xirt) & count >= 5)
+tmp$bar1 <- ave(tmp$xirt, tmp$classid3)
+tmp$bar2 <- ave(tmp$Exirt2_jags, tmp$classid3)
+u <- unique(tmp[,c("classid3","bar1","bar2")])
+print(cor(u$bar1, u$bar2))
+print(summary(lm(bar1 ~ bar2, data=u)))
+
+tmp <- subset(do, !is.na(xirt))
+tmp$xirt <- tmp$xirt - mean(tmp$xirt)
+tmp$Exirt2_jags <- tmp$Exirt2_jags - mean(tmp$Exirt2_jags)
+for(v in c("x_spec_gifted","x_frl","x_sexM","x_raceblack","x_racehisp","treatment")){
+  cat(paste("\n\n######",v,"#####\n"))
+  print(tapply(tmp$xirt, tmp[,v], mean))
+  print(tapply(tmp$Exirt2_jags, tmp[,v], mean))
+}
+rm(tmp)
+
+#####################
+## save the results
+#####################
+r <- r[,tokeep]
+save(r, file=objfile, compress=TRUE)
+write.table(r, file=csvfile, col.names=TRUE, row.names=FALSE, sep=",")

@@ -1,0 +1,60 @@
+#### additional data cleaning for the purpose of compliance model
+
+
+
+print(load('../../data/RANDstudyData/HSdata.RData'))
+print(load('../../data/sectionLevelUsageData/advanceData.RData'))
+
+
+if(is.element('year2',ls())) if(year2) dat <- droplevels(dat[dat$year==2,])
+
+#dat$xirtOrig <- xirtOrig
+
+#### take out schools with everyone missing
+trtDat <- subset(dat,treatment=='1')
+
+schoolMiss <- vapply(unique(trtDat$schoolid2),function(schl) mean(trtDat$field_id[trtDat$schoolid2==schl]%in%advance$field_id),1)
+
+#print(data.frame(schoolMiss,unique(trtDat$schoolid2))[order(schoolMiss),])
+
+### take out schools with preponderance of missingness, and their pairs
+### there are three treatment schools where almost no one is in the "advance" dataset
+### s3067 has 0% data, s3006 has 2% and s2042 has 7% DELETE THEM
+print(dropSchools <- unique(trtDat$schoolid2)[schoolMiss<0.2])
+print(dropMatch <- unique(dat$pair[dat$schoolid2%in%dropSchools]))
+
+datSmall <- dat[!dat$pair%in%dropMatch,]
+
+### did this do what we want?
+#print(setdiff(unique(dat$pair),unique(datSmall$pair)))
+#print(setdiff(unique(dat$schoolid2),unique(datSmall$schoolid2)))
+### hmm there were only five deleted schools.... why?
+#for(pp in dropMatch) print(paste(pp,do.call('paste',as.list(unique(dat$schoolid2[dat$pair==pp])))))
+                                        #ahh s3067 was the only school in pair LHI. wonder why.
+
+### how many students deleted
+deletedStudents <- nrow(dat)-nrow(datSmall)
+### how many treated students deleted
+deletedTrt <- sum(dat$treatment=='1')-sum(datSmall$treatment=='1')
+
+### for preliminary analyses just use treated students
+if('prelim'%in%ls()) if(prelim){
+                         dat <- dat[dat$treatment==1,]
+                         print('WARNING: ONLY USING TREATED SCHOOLS')
+                         }
+
+## OK I'm OK with this...
+dat <- datSmall
+rm(datSmall)
+### there are repeated students in dat.
+dupStud <- duplicated(dat$field_id,fromLast=TRUE)
+dat <- dat[dupStud==FALSE,]
+
+
+advance <- advance[advance$field_id%in%dat$field_id,]
+
+nschool <- length(unique(dat$schoolid2))
+ntrtSchool <- length(unique(dat$schoolid2[dat$treatment=='1']))
+nstud <- length(unique(dat$field_id))
+ntrtStud <- sum(dat$treatment=='1')
+imputedTrtStud <- ntrtStud-length(unique(advance$field_id))

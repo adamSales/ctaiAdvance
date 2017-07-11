@@ -1,0 +1,74 @@
+model{
+ ## measurement model
+ for(sw in 1:nsecWorked){
+ # gradNew[sw] ~ dbern(probB[sw])
+  grad[sw] ~ dbern(prob[sw])
+  prob[sw] <- 1/(1+exp(-linPred[sw]))
+  linPred[sw] <- studEff[studentM[sw]]+secEff[section[sw]]
+ }
+ sdSeff <- sd(studEff[])
+ avgSeff <- mean(studEff[])
+ for(i in 1:nstud){
+  ### Usage
+  studEff[i] ~ dnorm(muU[i],tauU)
+  muU[i] <- X[i,]%*%betaU+teacherEffU[teacher[i]]
+
+  ### Outcome
+  Ynew[i] ~ dnorm(muY[i],tauY)
+  Y[i] ~ dnorm(muY[i],tauY)
+  muY[i] <- X[i,]%*%betaY + useEff[i]+trtEff[i]*Z[i]+teacherEffY[teacher[i]]+pairEffect[pair[i]]
+
+  #Ustd[i] <- (studEff[i]-avgSeff)/sdSeff
+  useEff[i] <- a[1]+a[2]*studEff[i]+a[3]*studEff[i]^2
+  trtEff[i] <- b[1]+b[2]*studEff[i]+b[3]*studEff[i]^2
+
+
+ }
+ for(tch in 1:ntch){
+  teacherEffU[tch]~dnorm(schoolEffU[school[tch]],tauTchU)
+  teacherEffY[tch]~dnorm(schoolEffY[school[tch]],tauTchY)
+ }
+ for(scl in 1:nscl){
+  schoolEffU[scl]~dnorm(0,tauSclU)
+  schoolEffY[scl]~dnorm(0,tauSclY)
+ }
+
+ #for(u in 1:nunit){
+ # unitEff[u]~dnorm(0,tauUn)
+ #}
+
+ ### priors
+ for(knot in 1:3){
+  a[knot]~dnorm(0,1)
+  b[knot]~dnorm(0,1)
+ }
+ for(covar in 1:ncovar){
+  betaU[covar]~dnorm(0,1/3)
+  betaY[covar]~dnorm(0,1/3)
+ }
+
+ for(pp in 1:npair){
+  pairEffect[pp] ~ dnorm(0,1/3)
+ }
+
+ for(sec in 1:nsec){
+  secEff[sec]~dnorm(0,1/100)
+ }
+
+ tauU~dgamma(0.001,0.001)
+ sig2U <- 1/tauU
+ sig2Y~dunif(0.1,1)
+ tauY <- 1/sig2Y
+ tauTchU~dgamma(0.001,0.001)
+ sig2TchU <- 1/tauTchU
+ tauTchY~dgamma(0.001,0.001)
+ sig2TchY <- 1/tauTchY
+ tauSclU~dgamma(0.001,0.001)
+ sig2SclU <- 1/tauSclU
+ tauSclY~dgamma(0.001,0.001)
+ sig2SclY <- 1/tauSclY
+# tauSec~dgamma(0.001,0.001)
+# sig2Sec<-1/tauSec
+# tauUn~dgamma(0.001,0.001)
+# sig2Un<-1/tauUn
+}

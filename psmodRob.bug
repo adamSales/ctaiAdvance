@@ -1,0 +1,109 @@
+model{
+ ## measurement model
+ for(sw in 1:nsecWorked){
+ # gradNew[sw] ~ dbern(probB[sw])
+  grad[sw] ~ dbern(prob[sw])
+  prob[sw] <- 1/(1+exp(-linPred[sw]))
+  linPred[sw] <- studEff[studentM[sw]]+secEff[section[sw]]
+ }
+
+ for(i in 1:nstud){
+
+  ### Usage
+  studEff[i] ~ dt(muU[i],tauU,nu.u)
+  muU[i] <- X[i,]%*%betaU+teacherEffU[teacher[i]]
+
+  ### Outcome
+  Ynew[i] ~ dt(muY[i],tauY[Z[i]+1],nu.y[Z[i]+1])
+  Y[i] ~ dt(muY[i],tauY[Z[i]+1],nu.y[Z[i]+1])
+  muY[i] <- X[i,]%*%betaY + useEff[i]+trtEff[i]*Z[i]+teacherEffY[teacher[i]]+pairEffect[pair[i]]
+
+  useEff[i] <- a0+a1*studEff[i]
+  trtEff[i] <- b0+b1*studEff[i]
+
+
+ }
+ for(tch in 1:ntch){
+  teacherEffU[tch]~dt(schoolEffU[school[tch]],tauTchU,nu.tchu)
+  teacherEffY[tch]~dt(schoolEffY[school[tch]],tauTchY,nu.tchy)
+ }
+ for(scl in 1:nscl){
+  schoolEffU[scl]~dt(0,tauSclU,nu.sclu)
+  schoolEffY[scl]~dt(0,tauSclY,nu.scly)
+ }
+ for(sec in 1:nsec){
+  secEff[sec]~dt(unitEff[unit[sec]],tauSec,nu.sec)
+ }
+ for(u in 1:nunit){
+  unitEff[u]~dt(0,tauUn,nu.un)
+ }
+
+
+ ### priors
+ a0~dnorm(0,1/3)
+ a1~dnorm(0,1/3)
+ a2~dnorm(0,1/3)
+ b0~dnorm(0,1/3)
+ b1~dnorm(0,1/3)
+ b2~dnorm(0,1/3)
+ for(covar in 1:ncovar){
+  betaU[covar]~dnorm(0,1/3)
+  betaY[covar]~dnorm(0,1/3)
+ }
+
+ for(pp in 1:npair){
+  pairEffect[pp] ~ dnorm(0,1/3)
+ }
+
+ tauUn <- 1/sig2Un
+ sig2Un ~ dunif(0.01,10)
+ tauPretest<-1/sig2Pretest
+ sig2Pretest ~ dunif(0.01,10)
+ tauU<- 1/sig2U
+ sig2U ~ dunif(0.001,10)
+ sig2Y[1]~dunif(0.01,10)
+ tauY[1] <- 1/sig2Y[1]
+ sig2Y[2]~dunif(0.01,10)
+ tauY[2] <- 1/sig2Y[2]
+ tauTchX<- 1/sig2TchX
+ sig2TchX ~ dunif(0.01,10)
+ tauTchY <- 1/sig2TchY
+ sig2TchY ~ dunif(0.01,10)
+ tauTchU <- 1/sig2TchU
+ sig2TchU ~ dunif(0.01,10)
+ tauSclX <- 1/sig2SclX
+ sig2SclX ~ dunif(0.01,10)
+ tauSclY <- 1/sig2SclY
+ sig2SclY ~ dunif(0.01,10)
+ tauSclU <- 1/sig2SclU
+ sig2SclU ~ dunif(0.01,10)
+ tauSec <- 1/sig2Sec
+ sig2Sec ~ dunif(0.01,10)
+
+ nu.x <- nuA.x + 1
+ nuA.x ~ dexp(1/29)
+ nu.u<- nuA.u+1
+ nuA.u ~ dexp(1/29)
+ nu.y[1] <- nuA.y[1]+1
+ nu.y[2] <- nuA.y[2]+1
+ nuA.y[1]~ dexp(1/29)
+ nuA.y[2]~ dexp(1/29)
+ nu.tchu<-nuA.tchu+1
+ nuA.tchu~ dexp(1/29)
+ nu.tchy <- nuA.tchy+1
+ nuA.tchy~ dexp(1/29)
+ nu.tchx <- nuA.tchx+1
+ nuA.tchx~ dexp(1/29)
+ nu.sclu<-nuA.sclu+1
+ nuA.sclu~ dexp(1/29)
+ nu.scly <- nuA.scly+1
+ nuA.scly~ dexp(1/29)
+ nu.sclx <- nuA.sclx+1
+ nuA.sclx~ dexp(1/29)
+ nu.sec <- nuA.sec+1
+ nuA.sec ~ dexp(1/29)
+ nu.un <- nuA.un+1
+ nuA.un ~ dexp(1/29)
+
+
+}

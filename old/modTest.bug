@@ -1,0 +1,10 @@
+model{
+ for(i in 1:n){
+  y[i]~dnorm(mu[i],tau)
+  mu[i]<- a+b*x[i]
+ }
+ a~dnorm(0,1/100)
+ b~dnorm(0,1/100)
+ tau <- pow(sig,-2)
+ sig~dunif(0,100)
+}

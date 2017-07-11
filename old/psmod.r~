@@ -1,0 +1,29 @@
+
+load('../../data/RANDstudyData/HSdata.RData')
+load('../../data/sectionLevelUsageData/advanceDataWInfo.RData')
+
+dat <- dat[order(dat$year),]
+dat <- dat[!duplicated(dat$field_id),] # removes second mention
+dat$sid <- 1:nrow(dat)
+
+### look at promotion
+### delete "CP" sections. Logic: these are missing data, since we don't get to see if student
+### would have graduated. Student random effects calculated using observed sections. FIML?
+advance <- droplevels(subset(advance, status%in%c('graduated','promoted')))
+
+### just look at algebra I sections--- likely different advance patterns in other curricula
+### make sure to keep algebra i units that are also part of other curricula
+algUnit <- unique(advance$unit[advance$curriculum=='algebra i'])
+advance <- subset(advance,unit%in%algUnit)
+
+advance$grad <- advance$status=='graduated'
+
+advance <- advance[advance$field_id%in%dat$field_id,]
+
+nsecWorked <- nrow(advance)
+grad <- advance$grad
+sid <- dat$sid
+names(sid) <- dat$field_id
+studentM <- sid[as.character(advance$field_id)]
+
+jagsDat <- list('nsecWorked','grad','studentM','section','X','teacher','Z','Xm','school','nstud','Y','ntch','nscl','nsec','nunit')

@@ -1,0 +1,24 @@
+################################################################
+### Here's where I make things artifical
+##################################################
+
+### first delete control schools
+dat <- subset(dat,treatment==1)
+
+### now double the dataset
+dat$schoolid2 <- as.character(dat$schoolid2)
+dat$teachid2 <- as.character(dat$teachid2)
+dat2 <- dat
+dat2$schoolid2 <- paste0(dat2$schoolid2,'Fake')
+dat2$teachid2 <- paste0(dat2$teachid2,'Fake')
+dat2$field_id <- dat2$field_id*100+99
+dat2$treatment <- 0
+dat <- rbind(dat,dat2)
+
+### now delete usage data for "control" group
+# advance <- advance[advance$field_id%in%dat$field_id,]
+advance <- advance[advance$field_id%in%dat$field_id[dat$treatment==1],]
+
+#########################################################
+### The rest is the same
+#####################################################

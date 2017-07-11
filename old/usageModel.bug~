@@ -1,0 +1,8 @@
+model{
+ for(i in 1:N){
+  muAb[i] <- X[i,]%*%betaAb+teacherEffectAb[teacher[i]]+bx*pretest[i]
+  muPre[i] = X[i,]*betaPre+teacherEffectPre[teacher[i]]
+
+  ability[i]~normal(muAb[i],sigAb)
+
+  pretest[i]~normal(muPre[i],sigPre)

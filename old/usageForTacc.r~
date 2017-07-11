@@ -1,0 +1,33 @@
+library(lme4)
+library(arm)
+load('~/Box Sync/CT/data/sectionLevelUsageData/advanceDatawInfo.RData')
+
+### look at promotion
+### delete "CP" sections. Logic: these are missing data, since we don't get to see if student
+### would have graduated. Student random effects calculated using observed sections. FIML?
+advance <- droplevels(subset(advance, status%in%c('graduated','promoted')))
+
+### just look at algebra I sections--- likely different advance patterns in other curricula
+### make sure to keep algebra i units that are also part of other curricula
+algUnit <- unique(advance$unit[advance$curriculum=='algebra i'])
+advance <- subset(advance,unit%in%algUnit)
+
+advance$grad <- advance$status=='graduated'
+
+mod1 <- glmer(grad~grade+race+sex+frl+(xirt+state)*year+esl+spec+(1|field_id)+(1+year|teachid2)+(1|schoolid2)+(1|section/unit),family=binomial,data=advance)
+
+binnedplot(predict(mod1,type='response'),resid(mod1,type='response'))
+
+
+### can we predict students' random effects from their covariates?
+X <- model.matrix(mod1)
+predEf <- function(id,mod) X[id,]%*%fixef(mod)
+
+predictions <- NULL
+### leave one (school) out to check predictions for random effects
+for(scl in unique(advance$schoolid2)){
+    newMod <- update(mod1,subset=schoolid2!=scl)
+    loIDs <- unique(advance$field_id[advance$schoolid2==scl])
+    predictions <- rbind(predictions, cbind(loIDs,predEf(loIDs,newMod)))
+}
+

@@ -1,0 +1,179 @@
+### only look at year 2
+### and only at students who weren't in  year 1
+library(splines)
+library(R2jags)
+memory.limit(50000)
+
+load('../../data/RANDstudyData/HSdata.RData')
+load('../../data/sectionLevelUsageData/advanceData.RData')
+
+lu <- function(x) length(unique(x))
+
+dat <- dat[!dat$field_id%in%dat$field_id[dat$year==1],]
+table(dat$year)
+
+dat <- droplevels(dat)
+### look at promotion
+### delete "CP" sections. Logic: these are missing data, since we don't get to see if student
+### would have graduated. Student random effects calculated using observed sections. FIML?
+advance <- droplevels(subset(advance, status%in%c('graduated','promoted')))
+
+advance <- advance[advance$field_id%in%dat$field_id[dat$treatment==1],]
+
+### just look at algebra I sections--- likely different advance patterns in other curricula
+### make sure to keep algebra i units that are also part of other curricula
+algUnit <- unique(advance$unit[advance$curriculum=='algebra i'])
+advance <- subset(advance,unit%in%algUnit)
+
+advance$grad <- advance$status=='graduated'
+
+advance <- droplevels(advance)
+
+
+### discard some pairs
+## discard treatment schools with no usage data
+## (do a robustness check with everything left in afterwards)
+percUse <- function(scl)
+    length(intersect(unique(dat$field_id[dat$schoolid2==scl]),unique(advance$field_id)))/
+        length(unique(dat$field_id[dat$schoolid2==scl]))
+
+obsUse <- vapply(unique(dat$schoolid2[dat$treatment==1]),percUse,1)
+
+obsUse <- unique(dat$schoolid2[dat$treatment==1])[obsUse>0.1]
+obsUse <- c(as.character(obsUse),as.character(unique(dat$schoolid2[dat$treatment==0])))
+
+dat <- dat[dat$schoolid2%in%obsUse,]
+
+## discard pairs with only a treatment or a control school
+pairTrtTab <- with(dat,table(pair,treatment))
+trtVar <- apply(pairTrtTab,1,prod)
+dat <- dat[trtVar[dat$pair]>0,]
+
+advance <- advance[advance$field_id%in%dat$field_id,]
+
+aaa <- aggregate(advance$grad,by=list(section=advance$section),FUN=mean)
+aaa$n <- as.vector(table(advance$section))
+
+advance <- subset(advance,section%in%aaa$section[aaa$n>100 & aaa$x<1] & year==2)
+
+advance <- droplevels(advance)
+dat <- droplevels(dat)
+
+dat$sid <- 1:nrow(dat)
+
+nsecWorked <- nrow(advance)
+grad <- advance$grad
+sid <- dat$sid
+names(sid) <- dat$field_id
+studentM <- sid[as.character(advance$field_id)]
+nstud <- max(sid)
+stopifnot(nstud==length(unique(dat$field_id)))
+section <- as.numeric(as.factor(advance$section))
+nsec <- max(section)
+stopifnot(nsec==length(unique(advance$section)))
+
+## just linear xirt effects this time
+X <- model.matrix(~race+sex+spec,data=dat)[,-1]
+#X <- scale(X)
+ncovar <- ncol(X)
+
+dat$classid2 <- as.character(dat$classid2)
+dat$lag_gp <- as.character(dat$lag_gp)
+### copied from JR's code
+
+  dat$count <- ave(1-dat$xirtMIS, dat$classid2, FUN=sum)
+  tmp <- unique(dat[,c("classid2","count")])
+  tmp <- tmp[order(tmp$count),]
+  print(subset(tmp, count <= 2))
+  dat$classid3 <- dat$classid2
+  stopifnot(sum(dat$classid2 == "C99999999") == 0)
+  dat$classid3[which(dat$count <= 2)] <- "C99999999"
+print(c(lu(dat$classid2), lu(dat$classid3)))
+
+  dat$countv <- ave(1-dat$xirtMIS, dat$lag_gp, FUN=sum)
+  print(subset(unique(dat[,c("lag_gp","countv")]), countv <= 10))
+  dat$lag_gp[which(dat$countv <= 10)] <- "_collapsed"
+  dat$vargroup <- as.numeric(as.factor(dat$lag_gp))
+  dat$countv <- ave(rep(1, nrow(dat)), dat$lag_gp, FUN=sum)
+  tmp <- unique(dat[,c("vargroup","lag_gp","countv")])
+  print(tmp[order(tmp$vargroup),])
+dat$countv <- NULL
+
+ nclass <- lu(dat$classid3)
+ cid <- dat$cid <- as.numeric(as.factor(dat$classid3))
+
+  tmp <- subset(dat, !is.na(xirtOrig))
+  nstuobs <- nrow(tmp)
+  sidX <- tmp$sid
+  xirt <- tmp$xirt
+  precme <- 1 / (tmp$xirt_sem^2)
+
+vargroup <- dat$vargroup
+nvg <- lu(vargroup)
+### end copy
+
+
+teacher <- as.numeric(as.factor(dat$teachid2))
+ntch <- max(teacher)
+stopifnot(ntch==length(unique(dat$teachid2)))
+
+Z <- as.numeric(dat$treatment)
+
+Xm <- colMeans(X)
+
+school <- as.numeric(as.factor(dat$schoolid2))
+school <- vapply(1:nclass,function(i) school[cid==i][1],1)
+nscl <- max(school)
+stopifnot(nscl==length(unique(dat$schoolid2)))
+
+Y <- dat$Y
+
+unit <- as.numeric(as.factor(advance$unit))
+unit <- vapply(1:nsec,function(i) unit[section==i][1],1)
+nunit <- max(unit)
+stopifnot(nunit==length(unique(advance$unit)))
+
+##### trying a second time
+
+
+## for calculating the variance of studEff
+covX <- cov(X)
+
+### forgot pair fixed effects
+pair <- as.numeric(dat$pair)
+npair <- max(pair)
+stopifnot(npair==length(unique(dat$pair)))
+
+#######################
+#### knots for spline
+#######################
+makeKnots <- function(nknots)
+    qnorm(seq(1/(nknots+1),nknots/(nknots+1),length=nknots),mean=0,sd=1.5)
+
+makeKnotsX <- function(nknots)
+    quantile(xirt,seq(1/(nknots+1),nknots/(nknots+1)))
+
+jagsDat <- list('nsecWorked','grad','studentM','section','X','teacher','Z','Xm','school','nstud','Y','ntch','nscl','nsec','unit','nunit','ncovar','npair','pair','knot','nknots','knotx','nstuobs','nclass','cid','sidX','xirt','precme','vargroup','nvg')
+
+params <- c('prob','studEff','secEff','alphaU','betaU','classEffU','schoolEffU','Ynew','tauY','useEff','trtEff','betaY','classEffY','classEffX','schoolEffY','Ustd','a0','a1','a2','b0','b1','b2','tauClsU','tauClsY','tauSclU','tauSclY','tauSec','tauUn','tauU','sigU','sigY','sigClsU','sigClsY','sigClsX','sigSclU','sigSclY','siguu','bu','bt','uu','ut','u','betaX','sdstu')
+
+### for(kkk in 1:5){
+###     print(kkk)
+###     nknots <- kkk
+###     knot <- makeKnots(kkk)
+###     print(Sys.time())
+###     mod <- jags(jagsDat,parameters=params,model.file='src/psmodLinSpline.bug',n.chains=4,n.iter=4000,n.thin=4)
+###     save(mod,file=paste0('splineMod',kkk,'.RData'))
+###     rm(mod); gc()
+### }
+
+xirt <- dat$xirt
+nknots <- 5
+knot <- makeKnots(nknots)
+knotx <- makeKnots(nknots)
+print(Sys.time())
+mod <- jags(jagsDat,parameters=params,model.file='src/psmodLinSpline.bug',n.chains=4,n.iter=4000,n.thin=4)
+#update(mod,n.iter=4000)
+save(mod,file=paste0('splineMod',Sys.Date(),'.RData'))
+print(Sys.time())
+

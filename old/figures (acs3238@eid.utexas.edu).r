@@ -1,0 +1,166 @@
+library(jagstools)
+#### placebo treatment effects
+
+plotEff <- function(mod,te,U,type,leg=TRUE,pos='topright',file){
+    if(!missing(file)) pdf(file)
+    trtEff <- mod$BUGSoutput$sims.list$trtEff
+    studEff <- mod$BUGSoutput$sims.list$studEff
+
+    samp <- sample(1:nrow(trtEff),200)
+    studEff95 <- quantile(studEff,c(0.025,0.975))
+    plot(studEff[1,],trtEff[1,],col='white',ylim=range(trtEff[studEff<studEff95[2] & studEff>studEff95[1]]),
+         xlim=studEff95,xlab=expression(eta),ylab='Treatment Effect')
+    sapply(samp,function(rr) lines(sort(studEff[rr,]),trtEff[rr,order(studEff[rr,])],
+                                   col=adjustcolor('red',.3)))
+
+    if(!missing(te) & !missing(U)){
+        U <- U-mean(U)+mean(studEff)
+        U <- U/sd(U)*sqrt(mean(apply(studEff,1,var)))
+        lines(sort(U),te[order(U)],lwd=2)
+        if(leg) legend(pos,legend=c('True Effect','MCMC Draws'),lty=1,col=c('black','pink'))
+    } else if(!missing(type)){
+        b <- mod$BUGSoutput$sims.list$b
+        if( type=='lin')
+            curve(mean(b[,1])+mean(b[,2])*x,lwd=2,add=TRUE)
+        if( type=='quad')
+            curve(mean(b[,1])+mean(b[,2])*x+mean(b[,3])*x^2,lwd=2,add=TRUE)
+        if(type=='disc')
+            curve(ifelse(x<= -0.66,mean(b[,1]),
+                  ifelse(x<= 0.66, mean(b[,2]),mean(b[,3]))),lwd=2,add=TRUE)
+        if(leg) legend(pos,legend=c('Mean Est. Effect','MCMC Draws'),lty=1,col=c('black','red'))
+    }
+    if(!missing(file)) dev.off()
+    invisible(NULL)
+}
+
+### true effect: quadratic
+checks <- list()
+
+load('~/Google Drive/CTmodels/use/quadEffModels2017-06-14.RData')
+#pdf('output/quadCheck.pdf',height=2,width=6.5)
+#par(mfrow=c(1,3))
+fileNames <- paste0('output/quadCheck',names(quadEffModels),'.pdf')
+sapply(1:3,function(i) plotEff(quadEffModels[[i]],te,U,leg=TRUE,file=fileNames[i]))
+#dev.off()
+checks$quad <- lapply(quadEffModels,function(mod) jagsresults(mod,'b'))
+
+rm(quadEffModels);gc()
+
+### true effect: linear
+print(load('~/Google Drive/CTmodels/use/linEffModels2017-06-14.RData'))
+#pdf('output/linCheck.pdf',height=2,width=6.5)
+#par(mfrow=c(1,3))
+fileNames <- paste0('output/linCheck',names(linEffModels),'.pdf')
+sapply(1:3,function(i) plotEff(linEffModels[[i]],te,U,leg=TRUE,file=fileNames[i]))
+
+#dev.off()
+checks$lin <- lapply(linEffModels,function(mod) jagsresults(mod,'b'))
+
+rm(linEffModels);gc()
+
+### true effect: random
+print(load('~/Google Drive/CTmodels/use/constEffModels2017-06-14.RData'))
+#pdf('output/constCheck.pdf',height=2,width=6.5)
+#par(mfrow=c(1,3))
+fileNames <- paste0('output/constCheck',names(constEffModels),'.pdf')
+sapply(1:3,function(i) plotEff(constEffModels[[i]],te=rep(0.18,length(U)),U,leg=TRUE,file=fileNames[i]))
+
+#dev.off()
+checks$const <- lapply(constEffModels,function(mod) jagsresults(mod,'b'))
+
+rm(constEffModels);gc()
+
+
+### true effect: zero
+print(load('~/Google Drive/CTmodels/use/noEffModels2017-06-14.RData'))
+#pdf('output/zeroCheck.pdf',height=2,width=6.5)
+#par(mfrow=c(1,3))
+fileNames <- paste0('output/noCheck',names(noEffModels),'.pdf')
+sapply(1:3,function(i) plotEff(noEffModels[[i]],te=rep(0,length(U)),U,leg=TRUE,file=fileNames[i]))
+
+#dev.off()
+checks$zero <- lapply(noEffModels,function(mod) jagsresults(mod,'b'))
+
+## rm(noEffModels);gc()
+save(checks,file='output/checks.RData')
+
+## ### real effect
+print(load('~/Google Drive/CTmodels/use/realModels2017-06-13.RData'))
+sapply(names(realModels),function(nn) plotEff(realModels[[nn]],type=nn))
+
+
+### sample size figure
+
+
+mbar <- aggregate(grad,by=list(studentM),FUN=function(x) c(mean(x),length(x)))
+mbar$mbar <- mbar$x[,1]
+mbar$nsec <- mbar$x[,2]
+Eeta <- colMeans(realModels$lin$BUGSoutput$sims.list$studEff)
+pdf('output/sampleSizeMbar.pdf',height=2,width=6.5)
+par(mfrow=c(1,3),mar=c(5,4,1,2)+0.1)
+plot(mbar$nsec,mbar$mbar,ylab=expression(bar(m)),xlab='Number of Worked Sections',sub='(A)')
+plot(mbar$nsec,Eeta[mbar$Group.1],xlab='Number of Worked Sections',ylab=expression(paste('E',eta)),sub='(B)')
+plot(mbar$nsec,apply(realModels$lin$BUGSoutput$sims.list$studEff,2,sd)[mbar$Group.1],xlab='Number of Worked Sections',ylab=expression(paste('SD(',eta,')',sep='')),sub='(C)')
+dev.off()
+
+##### treatment effect estimate
+
+plotEff(realModels$lin,type='lin',leg=TRUE,file='output/linearTreatmentEffect.pdf')
+
+#### studEff vs m-bar
+library(ggplot2)
+mbar$Eeta <- Eeta[mbar$Group.1]
+qplot(Eeta,mbar, size=nsec,data=mbar,ylab=expression(bar(m)),xlab=expression(paste('E',eta,sep='')),
+      main=paste0('spearman rho=',round(with(mbar,cor(x[,1],Eeta,method='spearman')),2)))
+ggsave(file='output/mbarVsEta.pdf')
+
+
+### binned plot for measurement model
+pdf('output/binnedplot.pdf')
+library(bayesplot)
+samp <- sample(1:nrow(realModels$lin$BUGSoutput$sims.list$studEff),9)
+lp <- with(realModels$lin$BUGSoutput$sims.list,studEff[samp,studentM]+secEff[samp,section])
+prob <- exp(lp)/(1+exp(lp))
+ppc_error_binned(as.numeric(grad),prob)
+dev.off()
+
+
+pdf('output/treatmentEffect.pdf')
+ plotEff(mod)
+ a0 <- mod$BUGSoutput$sims.list$a0
+ a1 <- mod$BUGSoutput$sims.list$a1
+ b0 <- mod$BUGSoutput$sims.list$b0
+ b1 <- mod$BUGSoutput$sims.list$b1
+curve(mean(b0)+mean(b1)*x,add=TRUE,lwd=2)
+dev.off()
+
+############ plot EY|eta
+
+pdf('output/potentialOutcomes.pdf')
+curve(mean(a0)+mean(a1)*x,from=-3, to=3,ylim=c(-1.05,0.25),lwd=2,col='red',xlab=expression(eta),ylab=expression(paste('E[',Y[Z],'|',eta,']',sep='')),xlim=c(-3,3))
+curve(mean(b0)+mean(a0)+(mean(b1)+mean(a1))*x,add=TRUE,lwd=2,col='blue')
+x <- seq(-3,3,length=100)
+Yc <- outer(a1,x)[,1,]
+Yc <- apply(Yc,2,function(rr) rr+a0)
+YcUp <- apply(Yc,2,function(x) quantile(x,0.75))
+YcDown <- apply(Yc,2,function(x) quantile(x,0.25))
+polygon(c(x,rev(x)),c(YcUp,rev(YcDown)),col=adjustcolor('red',0.1))
+
+Yt <- outer(a1+b1,x)[,1,]
+Yt <- apply(Yt,2,function(rr) rr+a0+b0)
+YtUp <- apply(Yt,2,function(x) quantile(x,0.75))
+YtDown <- apply(Yt,2,function(x) quantile(x,0.25))
+polygon(c(x,rev(x)),c(YtUp,rev(YtDown)),col=adjustcolor('blue',0.1))
+
+legend('topleft',legend=c(expression(Y[C]),expression(Y[T])),col=c('red','blue'),lwd=2)
+dev.off()
+
+studEff <- mod$BUGSoutput$sims.list$studEff
+
+sdY <- sqrt(((sum(Z)-1)*var(Y[Z==1])+(sum(1-Z)-1)*var(Y[Z==0]))/(length(Y)-2))
+
+b1std <- b1*apply(studEff,1,sd)/sdY
+
+pdf('output/b1stdDens.pdf')
+plot(density(b1std),main='',sub='')
+dev.off()

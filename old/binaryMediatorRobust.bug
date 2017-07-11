@@ -1,0 +1,124 @@
+model{
+
+  ######################
+  ## outcome Model
+  ##################
+  # data level
+  for(ii in 1:N){
+
+
+    Y[ii]~dt(yhat[ii],prec.y,nu.y)
+    yhat[ii] <- alphaY+X[ii,]%*%gammaHat+M1[ii]*X[ii,]%*%gammaHat2+pairFE%*%pairDummy[ii,]
+	      +teacherEffectY[teacher[ii]]+tau1*M0[ii]*Z[ii]+tau2*M1[ii]*Z[ii]+lambda*M1[ii]
+
+  }
+  #teacher level
+  for(jj in 1:nteachers){
+    teacherEffectY[jj]~dt(tHatY[jj],prec.tY,nu.tY)
+    tHatY[jj] <- schoolEffectY[school[jj]]
+  }
+  ## school level
+  for(kk in 1:nschools){
+    schoolEffectY[kk]~dt(0,prec.sY,nu.tY)
+  }
+
+  #####################
+  ## usage model
+  ##################
+
+  for(i in 1:N){
+	      M0[i] <- 1-M1[i]
+	      M1[i] ~dbern(prob[i])
+	      prob[i] <- exp(logOdds[i])/(1+exp(logOdds[i]))
+	      logOdds[i] <- alpha+X[i,]%*%betaHat+teacherEffectTT[teacher[i]]
+
+
+  }
+  ## teacher level
+  for(j in 1:nteachers){
+    teacherEffectTT[j]~dt(tHat[j],prec.t,nu.t)
+    tHat[j] <- teacherX[j,]%*%betaTeacher+schoolEffectTT[school[j]]
+  }
+  ## school level
+  for(k in 1:nschools){
+    schoolEffectTT[k]~dt(0,prec.s,nu.s)
+    schoolEffectP[k]~dt(0,prec.ps,nu.ps)
+  }
+
+  ########################
+  ## priors
+  ########################
+  for(l in 1:pt){
+	      betaHat[l]~dnorm(0,1/9)
+	      gammaHat[l]~dnorm(0,1/9)
+	      gammaHat2[l]~dnorm(0,1/9)
+
+
+  }
+  for(pp in 1:np){
+    pairFE[pp]~dnorm(0,1/9)
+  }
+  for(vt in 1:pteach){
+   betaTeacher[vt]~dnorm(0,1/9)
+  }
+
+
+
+  prec.y~dgamma(0.001,0.001)
+  nu.y <- nuMinusOne.y + 1
+  nuMinusOne.y ~ dexp(1/29)
+
+  prec.tt~dgamma(0.001,0.001)
+  nu.tt <- nuMinusOne.tt + 1
+  nuMinusOne.tt ~ dexp(1/29)
+
+  prec.secMu~dgamma(0.001,0.001)
+  nu.secMu <- nuMinusOne.secMu + 1
+  nuMinusOne.secMu ~ dexp(1/29)
+
+  prec.tY~dgamma(0.001,0.001)
+  nu.tY <- nuMinusOne.tY + 1
+  nuMinusOne.tY ~ dexp(1/29)
+
+  prec.t~dgamma(0.001,0.001)
+  nu.t <- nuMinusOne.t + 1
+  nuMinusOne.t ~ dexp(1/29)
+
+  prec.sY~dgamma(0.001,0.001)
+  nu.sY <- nuMinusOne.sY + 1
+  nuMinusOne.sY ~ dexp(1/29)
+
+  prec.s~dgamma(0.001,0.001)
+  nu.s <- nuMinusOne.s + 1
+  nuMinusOne.s ~ dexp(1/29)
+
+  prec.ps~dgamma(0.001,0.001)
+  nu.ps <- nuMinusOne.ps + 1
+  nuMinusOne.ps ~ dexp(1/29)
+
+  prec.pt~dgamma(0.001,0.001)
+  nu.pt <- nuMinusOne.pt + 1
+  nuMinusOne.pt ~ dexp(1/29)
+
+	tau1~dnorm(0,1/9)
+	tau2~dnorm(0,1/9)
+	lambda~dnorm(0,1/9)
+
+  alphaP~dnorm(0,1/9)
+  alphaY~dnorm(0,1/9)
+  alpha~dnorm(0,1/9)
+
+  #overall <- mean(tau[1]*tt+tau[2]*pow(tt,2)+tau[3])
+
+  for(p in 1:np){
+    pairEffects[p]~dnorm(0,1/9)
+  }
+  minProb~dnorm(4,1/4)
+  theta~dunif(0,3)
+
+  prec.secDiff~dgamma(0.001,0.001)
+  nu.secDiff <- nuMinusOne.secDiff + 1
+  nuMinusOne.secDiff ~ dexp(1/29)
+
+
+}

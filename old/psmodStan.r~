@@ -1,0 +1,24 @@
+library(rstan)
+library(lme4)
+library(splines)
+
+source('src/jagsSims.r')
+source('src/makeData.r')
+source('src/dataPrep.r')
+
+#######################
+#### knots for spline
+#######################
+makeKnots <- function(nknots)
+    qnorm(seq(1/(nknots+1),nknots/(nknots+1),length=nknots),mean=0,sd=1.5)
+
+makeKnotsX <- function(nknots)
+    quantile(xirt,seq(1/(nknots+1),nknots/(nknots+1),length=nknots))
+
+X <- cbind(ns(dat$xirt,3),X)
+X <- scale(X,scale=FALSE)
+ncovar <- ncol(X)
+
+jagsDat <- c('nsecWorked','grad','studentM','section','X','teacher','Z','Xm','school','nstud','Y','ntch','nscl','nsec','unit','nunit','ncovar','npair','pair','knot','nknots','nclass','cid','Zcls','Zscl')
+
+

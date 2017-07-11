@@ -1,0 +1,94 @@
+model{
+ ## measurement model
+ for(sw in 1:nsecWorked){
+ # gradNew[sw] ~ dbern(probB[sw])
+  grad[sw] ~ dbern(prob[sw])
+  prob[sw] <- 1/(1+exp(-linPred[sw]))
+  linPred[sw] <- studEff[studentM[sw]]+secEff[section[sw]]
+ }
+ sdSeff <- sd(studEff[])
+ avgSeff <- mean(studEff[])
+ for(i in 1:nstud){
+  ### pretest imputation/measurement error
+  if(pretest.obs[i]==1){
+   xirt[i] ~ dnorm(pretest[i],pow(sem[i],-2))
+  }
+  pretest[i] ~ dnorm(muPretest[i],tauPretest)
+  muPretest[i] ~ X[i,]%*%betaPretest+teacherEffPretest[teacher[i]]
+
+  ### Usage
+  studEff[i] ~ dnorm(muU[i],tauU)
+  muU[i] <- X[i,]%*%betaU+bu.pretest*pretest[1]+bu.pretest2*pow(pretest[i],2)+teacherEffU[teacher[i]]
+
+  ### Outcome
+  Ynew[i] ~ dnorm(muY[i],tauY[Z[i]+1])
+  Y[i] ~ dnorm(muY[i],tauY[Z[i]+1])
+  muY[i] <- X[i,]%*%betaY + by.pretest*pretest[1]+by.pretest2*pow(pretest[i],2) + useEff[i]+trtEff[i]*Z[i]+teacherEffY[teacher[i]]+pairEffect[pair[i]]
+
+  useEff[i] <- a0+a1*studEff[i]
+  trtEff[i] <- b0+b1*studEff[i]
+
+
+ }
+ for(tch in 1:ntch){
+  teacherEffU[tch]~dnorm(schoolEffU[school[tch]],tauTchU)
+  teacherEffY[tch]~dnorm(schoolEffY[school[tch]],tauTchY)
+  teacherEffPretest[tch]~dnorm(schoolEffPretest[school[tch]],tauTchX)
+ }
+ for(scl in 1:nscl){
+  schoolEffU[scl]~dnorm(0,tauSclU)
+  schoolEffY[scl]~dnorm(0,tauSclY)
+  schoolEffPretest[scl]~dnorm(0,tauSclX)
+ }
+ for(sec in 1:nsec){
+  secEff[sec]~dnorm(unitEff[unit[sec]],tauSec)
+ }
+ for(u in 1:nunit){
+  unitEff[u]~dnorm(0,tauUn)
+ }
+
+
+ ### priors
+ a0~dnorm(0,1/3)
+ a1~dnorm(0,1/3)
+ a2~dnorm(0,1/3)
+ b0~dnorm(0,1/3)
+ b1~dnorm(0,1/3)
+ b2~dnorm(0,1/3)
+ for(covar in 1:ncovar){
+  betaU[covar]~dnorm(0,1/3)
+  betaY[covar]~dnorm(0,1/3)
+  betaPretest[covar]~dnorm(0,1/3)
+ }
+ by.pretest ~ dnorm(0,1/3)
+ bu.pretest ~ dnorm(0,1/3)
+ by.pretest2 ~ dnorm(0,1/3)
+ bu.pretest2 ~ dnorm(0,1/3)
+
+ for(pp in 1:npair){
+  pairEffect[pp] ~ dnorm(0,1/3)
+ }
+
+
+ sig2Pretest <- 1/tauPretest
+ sig2U <- 1/tauU
+ sit2U ~ dunif(0.001,10)
+ sig2Y~dunif(0.1,10)
+ tauY <- 1/sig2Y
+ sig2TchX <- 1/tauTchX
+ sit2TchX ~ dunif(0.1,10)
+ sig2TchU <- 1/tauTchU
+ sit2TchU ~ dunif(0.1,10)
+ sig2TchX <- 1/tauTchX
+ sig2TchX ~ dunif(0.1,10)
+ sig2SclY <- 1/tauSclY
+ sig2SclY ~ dunif(0.1,10)
+ sig2SclU <- 1/tauSclU
+ sig2SclU ~ dunif(0.1,10)
+ sig2SclY <- 1/tauSclY
+ sig2SclY ~ dunif(0.1,10)
+ sig2Sec<-1/tauSec
+ sig2Sec ~ dunif(0.1,10)
+ sig2Un<-1/tauUn
+ sig2Un ~ dunif(0.1,10)
+}

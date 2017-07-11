@@ -1,0 +1,66 @@
+#ifndef __STAN__MATH__MATRIX__BSPLINE_HPP__
+#define __STAN__MATH__MATRIX__BSPLINE_HPP__
+
+#include <boost/math/tools/promotion.hpp>
+#include <stan/math/matrix/Eigen.hpp>
+#include <stan/math/matrix/validate_matching_dims.hpp>
+#include <vector>
+
+namespace stan {
+  namespace math {
+
+    /**
+     * Return the B-spline curve with coefficients beta & knot vector knots at x  
+     *
+     * @tparam T1 Type of x.
+     * @tparam T2 Type of scalars in coefs.
+     * @tparam T3 Type of scalars in knots.
+     * @param P The order of the B-spline (P=4 -> cubic B splines)
+     * @param x The value at which to evaluate the B spline curve
+     * @param beta Vector of B-spline coefficients
+     * @param knots Vector of B-spline knots
+     * @return the function value at x
+     */
+    
+    
+   template <typename T1, typename T2, typename T3>
+   typename  boost::math::tools::promote_args<T1,T2,T3>::type
+   bspline(int P,
+           const T1& x,
+           const Eigen::Matrix<T2,Eigen::Dynamic,1>& beta,
+           const Eigen::Matrix<T3,Eigen::Dynamic,1>& knots) {
+      
+      typename boost::math::tools::promote_args<T1,T2,T3>::type fx = 0.0;
+      typename boost::math::tools::promote_args<T1,T2,T3>::type saved;
+      typename boost::math::tools::promote_args<T1,T2,T3>::type temp;
+      
+      Eigen::Matrix<typename boost::math::tools::promote_args<T1,T2,T3>::type, Eigen::Dynamic, 1> N(P);
+      Eigen::Matrix<typename boost::math::tools::promote_args<T1,T2,T3>::type, Eigen::Dynamic, 1> left(P);
+      Eigen::Matrix<typename boost::math::tools::promote_args<T1,T2,T3>::type, Eigen::Dynamic, 1> right(P);
+      
+      int i;
+      for(i = 0; i < knots.size(); ++i) {
+        if(x > knots(i) & x <= knots(i+1)) break;
+      }
+      
+      N(0) = 1.0;
+      for (int j = 1; j < P; ++j) {
+        left(j) = x - knots(i + 1 - j);
+        right(j) = knots(i + j) - x;
+        saved = 0.0; temp = 0.0;
+        for (int r = 0; r < j; ++r) {
+          temp = N(r)/(right(r + 1) + left(j - r));
+          N(r) = saved + right(r + 1) * temp;
+          saved = left(j - r) * temp;
+        }
+        N(j) = saved;
+      }
+      
+      for(int j = 0; j < P; ++j) fx += N(j)*beta(i - P + j);
+      
+      return fx;
+    }
+    
+  }
+}
+#endif

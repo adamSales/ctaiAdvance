@@ -1,0 +1,18 @@
+goodList <- function(sa,params){
+    sims.list <- list()
+    dn <- dimnames(sa)[[3]]
+    n.chain <- dim(sa)[2]
+    for(pp in params){
+        ind <- grep(pp,dn)
+        if(length(ind)>1){
+            ind <- grep(paste0('^',pp,'\['),dn)
+            sims <- sa[,,ind]
+            for(i in 1:n.chain)
+                sims.list[[pp]] <- rbind(sims.list[[pp]],sims[,i,])
+        } else
+            for(i in 1:nchain)
+                sims.list[[pp]] <- c(sims.list[[pp]],sa[,i,ind])
+    }
+    sims.list
+}
+
