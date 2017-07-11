@@ -1,7 +1,7 @@
 library(jagstools)
 #### placebo treatment effects
 
-plotEff <- function(mod,te,U,type,leg=TRUE,pos='topright',file){
+plotEff <- function(mod,te,U,leg=TRUE,pos='topright',file){
     if(!missing(file)) pdf(file)
     trtEff <- mod$BUGSoutput$sims.list$trtEff
     studEff <- mod$BUGSoutput$sims.list$studEff
@@ -294,3 +294,19 @@ errbar(c('Main','# Right (std)','Covariate Interactions','Full Data','Complete C
 
 
 
+plotFake <- function(){
+    modFiles <- list.files('~/Google Drive/CTmodels/fakeModels/')
+    for(nm in c('noEff','constEff','linEff','quadEff')){
+        print(nm)
+        file <- max(grep(nm,modFiles,value=TRUE))
+        load(paste0('~/Google Drive/CTmodels/fakeModels/',file))
+        mod <- get(nm)
+        if(nm=='noEff'){
+            plotEff(mod,c(0,0),quantile(mod$BUGSoutput$sims.list$studEff,c(0.025,0.975)),
+                    file='output/constEff.pdf')
+        } else{
+            dat <- get(paste0('jagsDatF',toupper(substr(nm,1,1)),substr(nm,2,nchar(nm)-3)))
+            plotEff(mod,dat$te,U,file=paste0('output/',nm,'.pdf'))
+        }
+    }
+}
