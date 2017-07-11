@@ -65,7 +65,7 @@ jagsDatFLin <- within(jagsDatF,{
   te <- 0.1/sd(U,na.rm=TRUE)*U
   te <- te-mean(te)+0.18
 
-  Y[Z==1] <- Yorig[Z==1]+te
+  Y[Z==1] <- Y[Z==1]+te
  }
 )
 
@@ -80,7 +80,7 @@ jagsDatFQuad <- within(jagsDatF,{
   te <- -(U[dat$treatment==1]-mean(U[dat$treatment==1]))^2
   te <- te/sd(te)*0.1
   te <- te-mean(te)+0.18
-  Y[Z==1] <- Yorig[Z==1]+te
+  Y[Z==1] <- Y[Z==1]+te
  }
 )
 
