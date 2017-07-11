@@ -14,11 +14,13 @@ plotEff <- function(mod,te,U,leg=TRUE,pos='topright',file){
          xlim=studEff95,xlab=expression(eta),ylab='Treatment Effect')
     sapply(samp,function(rr) abline(b0[rr],b1[rr],col=adjustcolor('red',.3)))
 
-    if(!missing(te) & !missing(U)){
-        U <- U-mean(U)+mean(studEff)
-        U <- U/sd(U)*sqrt(mean(apply(studEff,1,var)))
-        lines(sort(U),te[order(U)],lwd=2)
-        if(leg) legend(pos,legend=c('True Effect','MCMC Draws'),lty=1,col=c('black','pink'))
+    if(!missing(te)){
+        if(!missing(U)){
+            U <- U-mean(U)+mean(studEff)
+            U <- U/sd(U)*sqrt(mean(apply(studEff,1,var)))
+            lines(sort(U),te[order(U)],lwd=2)
+        } else abline(h=mean(te,na.rm=TRUE),lwd=2)
+        if(leg) legend(pos,legend=c('True Effect','MCMC Draws'),lty=1,col=c('black','red'))
     } else{
         curve(mean(b0)+mean(b1)*x,lwd=2,add=TRUE)
         if(leg) legend(pos,legend=c('Mean Est. Effect','MCMC Draws'),lty=1,col=c('black','red'))
@@ -220,7 +222,7 @@ print(xtable::xtable(miss,caption='Missing data and imputation error for pre-tre
 robustnessChecks <- function(){
     estimates <- NULL
     modFiles <- list.files('~/Google Drive/CTmodels/realModels/')
-    for(nm in c('lin','bc','saturated','full','cca')){
+    for(nm in c('lin','saturated','full','cca','bc')){
         print(nm)
         file <- max(grep(nm,modFiles,value=TRUE))
         load(paste0('~/Google Drive/CTmodels/realModels/',file))
@@ -229,7 +231,7 @@ robustnessChecks <- function(){
         if(nm=='bc') est <- est/sd(jagsDatBC$Y)*sd(jagsDatReal$Y)
         estimates <- rbind(estimates,est)
         rownames(estimates)[nrow(estimates)] <- nm
-        rm(list=c('nm','mod'))
+        rm(list=c(nm,'mod'))
     }
     estimates
 }
@@ -296,17 +298,19 @@ errbar(c('Main','# Right (std)','Covariate Interactions','Full Data','Complete C
 
 plotFake <- function(){
     modFiles <- list.files('~/Google Drive/CTmodels/fakeModels/')
-    for(nm in c('noEff','constEff','linEff','quadEff')){
-        print(nm)
-        file <- max(grep(nm,modFiles,value=TRUE))
+    for(modName in c('noEff','constEff','linEff','quadEff')){
+        print(modName)
+        file <- max(grep(modName,modFiles,value=TRUE))
         load(paste0('~/Google Drive/CTmodels/fakeModels/',file))
-        mod <- get(nm)
-        if(nm=='noEff'){
-            plotEff(mod,c(0,0),quantile(mod$BUGSoutput$sims.list$studEff,c(0.025,0.975)),
-                    file='output/constEff.pdf')
-        } else{
-            dat <- get(paste0('jagsDatF',toupper(substr(nm,1,1)),substr(nm,2,nchar(nm)-3)))
-            plotEff(mod,dat$te,U,file=paste0('output/',nm,'.pdf'))
+        mod <- get(modName)
+        if(modName=='noEff'){
+            plotEff(mod,te=0,file='output/noEff.pdf')
+        }else{
+            dat <- get(paste0('jagsDatF',toupper(substr(modName,1,1)),substr(modName,2,nchar(modName)-3)))
+            if(modName=='constEff'){
+                plotEff(mod,te=dat$te,file=paste0('output/',modName,'.pdf'))
+            } else plotEff(mod,te=dat$te,U=U,file=paste0('output/',modName,'.pdf'))
         }
+        rm(list=c(modName,'mod'))
     }
 }
