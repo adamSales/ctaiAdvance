@@ -61,6 +61,9 @@ save(list=ls(),file=paste0('~/Google Drive/CTmodels/fakeModels/constEff',Sys.Dat
                                         #load('logitUsage/mod1.RData')
 ## same mean and var of treatment effect as in mod2
 
+### U has a couple outliers:
+U[U< -4] <- -4
+
 jagsDatFLin <- within(jagsDatF,{
   te <- 0.1/sd(U,na.rm=TRUE)*U
   te <- te-mean(te)+0.18
@@ -77,7 +80,7 @@ save(list=ls(),file=paste0('~/Google Drive/CTmodels/fakeModels/linEff',Sys.Date(
 
 ########### quadratic effects
 jagsDatFQuad <- within(jagsDatF,{
-  te <- -(U[dat$treatment==1]-mean(U[dat$treatment==1]))^2
+  te <- -(U-mean(U))^2
   te <- te/sd(te)*0.1
   te <- te-mean(te)+0.18
   Y[Z==1] <- Y[Z==1]+te
