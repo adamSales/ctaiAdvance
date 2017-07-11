@@ -5,29 +5,22 @@ plotEff <- function(mod,te,U,type,leg=TRUE,pos='topright',file){
     if(!missing(file)) pdf(file)
     trtEff <- mod$BUGSoutput$sims.list$trtEff
     studEff <- mod$BUGSoutput$sims.list$studEff
+    b0 <- mod$BUGSoutput$sims.list$b0
+    b1 <- mod$BUGSoutput$sims.list$b1
 
     samp <- sample(1:nrow(trtEff),200)
     studEff95 <- quantile(studEff,c(0.025,0.975))
     plot(studEff[1,],trtEff[1,],col='white',ylim=range(trtEff[studEff<studEff95[2] & studEff>studEff95[1]]),
          xlim=studEff95,xlab=expression(eta),ylab='Treatment Effect')
-    sapply(samp,function(rr) lines(sort(studEff[rr,]),trtEff[rr,order(studEff[rr,])],
-                                   col=adjustcolor('red',.3)))
+    sapply(samp,function(rr) abline(b0[rr],b1[rr],col=adjustcolor('red',.3)))
 
     if(!missing(te) & !missing(U)){
         U <- U-mean(U)+mean(studEff)
         U <- U/sd(U)*sqrt(mean(apply(studEff,1,var)))
         lines(sort(U),te[order(U)],lwd=2)
         if(leg) legend(pos,legend=c('True Effect','MCMC Draws'),lty=1,col=c('black','pink'))
-    } else if(!missing(type)){
-        b0 <- mod$BUGSoutput$sims.list$b0
-        b1 <- mod$BUGSoutput$sims.list$b1
-        if( type=='lin')
-            curve(mean(b0)+mean(b1)*x,lwd=2,add=TRUE)
-        if( type=='quad')
-            curve(mean(b[,1])+mean(b[,2])*x+mean(b[,3])*x^2,lwd=2,add=TRUE)
-        if(type=='disc')
-            curve(ifelse(x<= -0.66,mean(b[,1]),
-                  ifelse(x<= 0.66, mean(b[,2]),mean(b[,3]))),lwd=2,add=TRUE)
+    } else{
+        curve(mean(b0)+mean(b1)*x,lwd=2,add=TRUE)
         if(leg) legend(pos,legend=c('Mean Est. Effect','MCMC Draws'),lty=1,col=c('black','red'))
     }
     if(!missing(file)) dev.off()
