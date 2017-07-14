@@ -7,11 +7,11 @@ jagsDatReal <- makeJagsDat(dat,advance)
 #realModels <- list()
 
 print(Sys.time())
-## lin <- jags.parallel(jagsDatReal,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=100000,n.thin=50)
-## print(Sys.time())
+main <- jags.parallel(jagsDatReal,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=100000,n.thin=50)
+print(Sys.time())
 
-## save(lin,jagsDatReal,file=paste0('~/Google Drive/CTmodels/realModels/lin',Sys.Date(),'.RData'))
-## rm(lin);gc()
+save(main,jagsDatReal,file=paste0('~/Google Drive/CTmodels/realModels/main',Sys.Date(),'.RData'))
+rm(main);gc()
 
 
 
@@ -22,6 +22,8 @@ print(Sys.time())
 trans <- with(jagsDatReal,MASS::boxcox(Y[Z==1]+1.8~X[Z==1,]+U))
 lambda <- trans$x[which.max(trans$y)]
 jagsDatBC <- jagsDatReal
+jagsDatBC$Y <- jagsDatBC$Y+1.8
+stopifnot(all(jagsDatBC$Y>0))
 if(lambda !=0) jagsDatBC$Y <- (jagsDatBC$Y^lambda-1)/lambda else jagsDatBC$Y <- log(jagsDatBC$Y)
 bc <- jags.parallel(jagsDatRAW,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=10000,n.thin=5)
 save(bc,jagsDatBC,lambda,trans,file=paste0('~/Google Drive/CTmodels/realModels/bc',Sys.Date(),'.RData'))
