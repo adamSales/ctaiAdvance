@@ -210,7 +210,7 @@ robustnessPlot <- function(){
  estimates <- estimates[c('raw','bc','cca','full','saturated','main'),]
 
  par(mar=c(4,5,0,0))
- errbar( c('Raw Scores','BC-transformed','Complete Cases','Full Data','Covariate Interactions','Main'),estimates[,1],estimates[,3], estimates[,2],ylim=c(min(estimates)-0.01,max(c(max(estimates),0.03))),ylab=expression(paste('Slope of ',tau,'(',eta[T],')')),lwd=2)
+ errbar( c('Raw Scores (BC trans.)','IRT Post-Test (BC trans.)','Complete Cases','Full Data','Covariate Interactions','Main'),estimates[,1],estimates[,3], estimates[,2],ylim=c(min(estimates)-0.01,max(c(max(estimates),0.03))),ylab=expression(paste('Slope of ',tau,'(',eta[T],')')),lwd=2)
  segments(estimates[,5],1:6, estimates[,4],1:6, lwd = 1)
 
  abline(v=0,lty=2)
