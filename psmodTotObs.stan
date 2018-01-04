@@ -27,11 +27,14 @@ data{
  real YtM[nstudTM];
  real Yc[nstudC];
  vector<lower=0,upper=1>[nstudTO] MbarTO;
+ vector<lower=0,upper=1>[nstudC] MbarC;
+ vector<lower=0,upper=1>[nstudTM] MbarTM;
+
 
 }
 parameters{
 
- vector[ncov] betaU;
+ //vector[ncov] betaU;
  vector[ncov] betaY;
 
  real a0;
@@ -40,49 +43,47 @@ parameters{
  real b1;
 
  real teacherEffY[nteacher];
- real teacherEffU[nteacher];
+ //real teacherEffU[nteacher];
  real pairEffect[npair];
- real schoolEffU[nschool];
+ //real schoolEffU[nschool];
  real schoolEffY[nschool];
 
  real<lower=0> sigTchY;
  real<lower=0> sigSclY;
  real<lower=0> sigY[2];
- real<lower=0> sigTchU;
- real<lower=0> sigSclU;
- real<lower=0> sigU;
+ //real<lower=0> sigTchU;
+ //real<lower=0> sigSclU;
+ //real<lower=0> sigU;
 
- vector<lower=0,upper=1>[nstudC] MbarC;
- vector<lower=0,upper=1>[nstudTM] MbarTM;
 }
 
 model{
  vector[nstudTO] muYtO;
  vector[nstudTM] muYtM;
  vector[nstudC] muYc;
- vector[nstudTO] muUtO;
- vector[nstudTM] muUtM;
- vector[nstudC] muUc;
+ //vector[nstudTO] muUtO;
+ //vector[nstudTM] muUtM;
+ //vector[nstudC] muUc;
 
  for(i in 1:nstudTO){
   muYtO[i]=teacherEffY[teacherTO[i]]+schoolEffY[schoolTO[i]]+pairEffect[pairTO[i]]+a0+b0+(a1+b1)*MbarTO[i];
-  muUtO[i]=teacherEffU[teacherTO[i]]+schoolEffU[schoolTO[i]];
+  //muUtO[i]=teacherEffU[teacherTO[i]]+schoolEffU[schoolTO[i]];
  }
 
  for(i in 1:nstudTM){
   muYtM[i]=teacherEffY[teacherTM[i]]+schoolEffY[schoolTM[i]]+pairEffect[pairTM[i]]+a0+b0+(a1+b1)*MbarTM[i];
-  muUtM[i]=teacherEffU[teacherTM[i]]+schoolEffU[schoolTM[i]];
+  //muUtM[i]=teacherEffU[teacherTM[i]]+schoolEffU[schoolTM[i]];
  }
 
 
  for(i in 1:nstudC){
   muYc[i]=teacherEffY[teacherC[i]]+schoolEffY[schoolC[i]]+pairEffect[pairC[i]]+a0+a1*MbarC[i];
-  muUc[i]=teacherEffU[teacherC[i]]+schoolEffU[schoolC[i]];
+  //muUc[i]=teacherEffU[teacherC[i]]+schoolEffU[schoolC[i]];
  }
 
  //priors
  betaY~normal(0,2);
- betaU~normal(0,2);
+ //betaU~normal(0,2);
  pairEffect~normal(0,2);
 
  a0~normal(0,1);
@@ -92,13 +93,13 @@ model{
 
 
  schoolEffY~normal(0,sigSclY);
- schoolEffU~normal(0,sigSclU);
- teacherEffU~normal(0,sigTchU);
+ //schoolEffU~normal(0,sigSclU);
+ //teacherEffU~normal(0,sigTchU);
  teacherEffY~normal(0,sigTchY);
 
- MbarTO~normal(alphaU+muUtO+XtO*betaU,sigU);
- MbarTM~normal(alphaU+muUtM+XtM*betaU,sigU);
- MbarC~normal(alphaU+muUc+Xc*betaU,sigU);
+ //MbarTO~normal(muUtO+XtO*betaU,sigU);
+ //MbarTM~normal(muUtM+XtM*betaU,sigU);
+ //MbarC~normal(muUc+Xc*betaU,sigU);
  YtO~normal(muYtO+XtO*betaY,sigY[2]);
  YtM~normal(muYtM+XtM*betaY,sigY[2]);
  Yc~normal(muYc+Xc*betaY,sigY[1]);
