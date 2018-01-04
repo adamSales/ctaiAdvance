@@ -31,7 +31,6 @@ data{
 }
 parameters{
 
- real alphaU;
  vector[ncov] betaU;
  vector[ncov] betaY;
 

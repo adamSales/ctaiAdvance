@@ -124,14 +124,11 @@ makeStanDatObs <- function(dat){
  stanDat
 }
 
-totDat <- dataPrep(dat,advance)
 datOrig <- dat
-advanceOrig <- advance
-dat <- totDat$dat
-advance <- totDat$advance
-rm(totDat);gc()
+dat <- dataPrepObs(dat,advance)
 
-sdat <- makeStanDat(dat,advance)
+sdat <- makeStanDatObs(dat)
+
 
 
 
