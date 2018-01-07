@@ -1,4 +1,4 @@
-#source('~/gitRepos/ctaiAdvance/prelimStan.r')
+source('~/gitRepos/ctaiAdvance/prelimStan.r')
 
 ################################################
 ## Fake Models
@@ -10,6 +10,9 @@ dat$U <- colMeans(extract(main,'studEff')[[1]])
 ### U has a couple outliers:
 dat$U[dat$U< -4] <- -4
 
+effs <- extract(main,c('b0','b1'))
+
+rm(main); gc()
 
 ##### make fake data:
 
@@ -72,7 +75,6 @@ save(constEff,sdatF,file='fittedModels/constEff.RData')
 ##################################
 ######### linear effect ##########
 ##################################
-effs <- extract(main,c('b0','b1'))
 datF$te <- mean(effs$b0)+mean(effs$b1)*datF$U
 datF$Yorig <- datF$Y
 datF$Y[datF$treatment==1] <- datF$Y[datF$treatment==1]+datF$te[datF$treatment==1]
