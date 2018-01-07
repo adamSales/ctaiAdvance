@@ -1,0 +1,4 @@
+source('src/prelimStan.r')
+library(lme4)
+
+rm <- with(sdat,glmer(grad~as.factor(section)+X[studentM,]+(1|studentM),family=binomial))
