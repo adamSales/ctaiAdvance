@@ -4,6 +4,10 @@ library(splines)
 library(rstan)
 memory.limit(50000)
 
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+
 #save(list=ls(),file=paste0('prev',Sys.time(),'.RData'))
 #rm(list=ls())
 

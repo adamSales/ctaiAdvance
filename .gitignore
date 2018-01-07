@@ -2,3 +2,4 @@
 .#prelimStanObs.r
 
 *.r#
+*.RData
