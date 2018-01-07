@@ -1,7 +1,15 @@
-library(dplyr)
+### only look at year 2
+### and only at students who weren't in  year 1
+library(splines)
+library(rstan)
+memory.limit(50000)
+
+#save(list=ls(),file=paste0('prev',Sys.time(),'.RData'))
+#rm(list=ls())
+
 load('~/Box Sync/CT/data/RANDstudyData/HSdata.RData')
 load('~/Box Sync/CT/data/sectionLevelUsageData/advanceData.RData')
-load('~/Box Sync/CT/data/problemLevelUsageData/probLevelData.RData')
+
 
 ## ### estimated eta using only treatment group
 ## library(jagstools)
@@ -65,6 +73,39 @@ dataPrep <- function(dat,advance,discard=TRUE){
  list(dat=dat,advance=advance)
 }
 
+makeStanDat <- function(dat,advance){
+ stanDat <- list()
+ advance <- droplevels(advance)
+ dat <- droplevels(dat)
+
+
+ stanDat$nsecWorked <- nrow(advance)
+ stanDat$nstud <- nrow(dat)
+ stanDat$nteacher <- nlevels(dat$teachid2)
+ stanDat$nschool <- nlevels(dat$schoolid2)
+ stanDat$nsec <- nlevels(advance$section)
+ stanDat$npair <- nlevels(dat$pair)
+
+ stanDat$teacher <- as.numeric(as.factor(dat$teachid2))
+ stanDat$pair <- as.numeric(dat$pair)
+ stanDat$school <- as.numeric(dat$school)
+ stanDat$studentM <- seq(stanDat$nstud)[match(advance$field_id,dat$field_id)]
+ stanDat$section <- as.numeric(advance$section)
+
+ stanDat$grad <- as.numeric(advance$grad)
+
+ X <- model.matrix(~poly(xirt,2)+race+sex+spec+state,data=dat)[,-1]
+ stanDat$X <- scale(X)
+ stanDat$ncov <- ncol(X)
+
+
+ stanDat$Z <- as.numeric(dat$treatment)
+
+ stanDat$Y <- dat$Y
+
+ stanDat
+}
+
 totDat <- dataPrep(dat,advance)
 datOrig <- dat
 advanceOrig <- advance
@@ -72,43 +113,7 @@ dat <- totDat$dat
 advance <- totDat$advance
 rm(totDat);gc()
 
+sdat <- makeStanDat(dat,advance)
 
-x$unit <- tolower(x$unit)
-x$section <- tolower(x$section)
-x$version <- tolower(x$version)
 
-advance$unit <- tolower(advance$unit)
-advance$section <- tolower(advance$section)
-advance$version <- tolower(advance$version)
 
-x <- x[x$field_id%in%advance$field_id,]
-
-x$ts1 <- as.POSIXct(x$ts1,format="%m/%d/%y %H:%M")
-
-Mode <- function(x){
-    tab <- table(x)
-    names(tab)[which.max(tab)]
-}
-
-errHintSum <- x%>%group_by(field_id,version,section,unit)%>%summarize(
-                                                                nprob=n(),
-                                                                nerr=sum(nerrs1>0,na.rm=TRUE),
-                                                                perr=mean(nerrs1>0,na.rm=TRUE),
-                                                                nhint=sum(nhints1>0,na.rm=TRUE),
-                                                                phint=mean(nhints1>0,na.rm=TRUE),
-                                                                ncurr=n_distinct(curriculum),
-    curr=Mode(curriculum),
-    start= min(ts1,na.rm=TRUE)
-    )
-
-adv2 <- merge(advance,errHintSum,all.x=TRUE)
-
-adv2 <- adv2%>%arrange(start)%>%group_by(field_id)%>%mutate(secOrd=rank(start))
-
-##keep1 <- adv2%>%filter(nerr>0|nhint>0)
-keep1 <- adv2%>%filter(nhint>0)
-
-sec100 <- keep1%>%group_by(section)%>%summarize(nn=n())
-adv <- adv2%>%filter((nhint>0) & section%in%sec100$section[sec100$nn>=100])
-
-save(adv,file='../advanceHardHint.RData')
