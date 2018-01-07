@@ -1,0 +1,15 @@
+pload('~/Box Sync/CT/data/RANDstudyData/MSdata.RData')
+datMS <- dat
+
+source('src/prelimStan.r')
+
+
+totDat <- dataPrep(datMS,advanceOrig)
+datOrig <- dat
+advanceOrig <- advance
+dat <- totDat$dat
+advance <- totDat$advance
+rm(totDat);gc()
+
+sdatMS <- makeStanDat(dat,advance)
+
