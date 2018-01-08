@@ -96,7 +96,7 @@ datF <- within(datF,{
     te <- -(U-mean(U))^2
     te <- te/sd(te)*0.1
     te <- te-mean(te)+0.13
-    Y[Z==1] <- Y[Z==1]+te
+    Y[treatment==1] <- Y[treatment==1]+te[treatment==1]
 })
 
 sdatFquad <- makeStanDat(datF,advanceF)

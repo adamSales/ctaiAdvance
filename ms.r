@@ -12,5 +12,6 @@ rm(totDat);gc()
 sdatMS <- makeStanDat(datMS,advanceMS)
 
 
-msMod <- stan('src/psmod.stan',data=sdatMS,iter=3000)
+msMod <- stan('src/psmod.stan',data=sdatMS,iter=6000)
 
+save(msMod,sdatMS,file="fittedModels/msMod.RData")

@@ -77,7 +77,7 @@ dataPrep <- function(dat,advance,discard=TRUE){
  list(dat=dat,advance=advance)
 }
 
-makeStanDat <- function(dat,advance){
+makeStanDat <- function(dat,advance,xInteract=FALSE){
  stanDat <- list()
  advance <- droplevels(advance)
  dat <- droplevels(dat)
@@ -99,6 +99,7 @@ makeStanDat <- function(dat,advance){
  stanDat$grad <- as.numeric(advance$grad)
 
  X <- model.matrix(~poly(xirt,2)+race+sex+spec+state,data=dat)[,-1]
+ if(xInteract) X <- model.matrix(~poly(xirt,2)*(race+sex+spec)+(race+sex+spec)^2+state,data=dat)[,-1]
  stanDat$X <- scale(X)
  stanDat$ncov <- ncol(X)
 

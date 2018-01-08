@@ -111,4 +111,12 @@ keep1 <- adv2%>%filter(nhint>0)
 sec100 <- keep1%>%group_by(section)%>%summarize(nn=n())
 adv <- adv2%>%filter((nhint>0) & section%in%sec100$section[sec100$nn>=100])
 
-save(adv,file='../advanceHardHint.RData')
+save(adv,file='advanceHardHint.RData')
+
+source('~/gitRepos/ctaiAdvance/prelimStan.r')
+
+adv$section <- factor(adv$section)
+sdatHard <- makeStanDat(dat,adv)
+
+hard <- stan('src/psmod.stan',data=sdatHard,iter=3000)
+save(hard,sdatHard,file='fittedModels/hardSections.RData')
