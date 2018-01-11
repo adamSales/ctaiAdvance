@@ -4,12 +4,13 @@ datMS <- dat
 source('src/prelimStan.r')
 
 
-totDat <- dataPrep(datMS,advanceOrig)
-datOrig <- dat
-advanceOrig <- advance
-dat <- totDat$dat
-advance <- totDat$advance
+totDatMS <- dataPrep(datMS,advanceOrig)
+datMS <- totDatMS$dat
+advanceMS <- totDatMS$advance
 rm(totDat);gc()
 
-sdatMS <- makeStanDat(dat,advance)
+sdatMS <- makeStanDat(datMS,advanceMS)
+
+
+msMod <- stan('src/psmod.stan',data=sdatMS,iter=3000)
 

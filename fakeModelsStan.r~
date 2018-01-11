@@ -1,8 +1,20 @@
-source('src/prelim.r')
+source('~/gitRepos/ctaiAdvance/prelimStan.r')
 
 ################################################
 ## Fake Models
 ##############################################
+
+### use data, E[studEff] from main model
+pload('fittedModels/stanMod.RData')
+dat$U <- colMeans(extract(main,'studEff')[[1]])
+### U has a couple outliers:
+dat$U[dat$U< -4] <- -4
+
+effs <- extract(main,c('b0','b1'))
+
+rm(main); gc()
+
+##### make fake data:
 
 ### first delete control schools
 datF <- subset(dat,treatment==1)
@@ -15,7 +27,18 @@ dat2$schoolid2 <- paste0(dat2$schoolid2,'Fake')
 dat2$teachid2 <- paste0(dat2$teachid2,'Fake')
 dat2$field_id <- dat2$field_id*100+99
 dat2$treatment <- 0
+
+### take bootstrap samples within each school
+for(scl in unique(datF$schoolid2)){
+    ind <- which(datF$schoolid2==scl)
+    datF[ind,] <- datF[sample(ind,length(ind),replace=TRUE),]
+    dat2[ind,] <- dat2[sample(ind,length(ind),replace=TRUE),]
+}
+
 datF <- rbind(datF,dat2)
+
+datF$schoolid2 <- factor(datF$schoolid2)
+datF$teachid2 <- factor(datF$teachid2)
 
 ### now delete usage data for "control" group
 advanceF <- advance[advance$field_id%in%datF$field_id[datF$treatment==1],]
@@ -23,72 +46,67 @@ advanceF <- advance[advance$field_id%in%datF$field_id[datF$treatment==1],]
 #########################################################
 ### Compile JAGS data as before
 #####################################################
-
-jagsDatF <- makeJagsDat(datF,advanceF)
-
+sdatF <- makeStanDat(datF,advanceF)
 
 print(Sys.time())
-noEff <- jags.parallel(jagsDatF,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=10000,n.thin=4)
-
-
+noEff <- stan('~/gitRepos/ctaiAdvance/psmod.stan',data=sdatF,iter=3000,chains=6)
 print(Sys.time())
-save(list=ls(),file=paste0('~/Google Drive/CTmodels/fakeModels/noEff',Sys.Date(),'.RData'));rm(noEff);gc()
+save(list=ls(),file='fittedModels/noEffect.RData')
 
 
 
 
 ######## constant effect
 ########
-jagsDatFConst <- within(jagsDatF,{
+sdatFConst <- within(sdatF,{
  te <- rnorm(sum(Z),0.18,0.1)
- Y[Z==1] <- Y[Z==1]+ te[Z==1]
+ Y[Z==1] <- Y[Z==1]+ te
  }
 )
 
 print(Sys.time())
-constEff <- jags.parallel(jagsDatFConst,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=10000,n.thin=4)
+constEff <- stan('~/gitRepos/ctaiAdvance/psmod.stan',data=sdatFConst,iter=3000,chains=6)
 
-save(list=ls(),file=paste0('~/Google Drive/CTmodels/fakeModels/constEff',Sys.Date(),'.RData'));rm(constEff);gc()
+save(constEff,sdatF,file='fittedModels/constEff.RData')
+
 
 
 
 ##################################
 ######### linear effect ##########
 ##################################
+datF$te <- mean(effs$b0)+mean(effs$b1)*datF$U
+datF$Yorig <- datF$Y
+datF$Y[datF$treatment==1] <- datF$Y[datF$treatment==1]+datF$te[datF$treatment==1]
 
-
-### Add linear treatment effect
-                                        #load('logitUsage/mod1.RData')
-## same mean and var of treatment effect as in mod2
-
-### U has a couple outliers:
-U[U< -4] <- -4
-
-jagsDatFLin <- within(jagsDatF,{
-  te <- 0.1/sd(U,na.rm=TRUE)*U
-  te <- te-mean(te)+0.18
-
-  Y[Z==1] <- Y[Z==1]+te
- }
-)
+sdatFlin <- makeStanDat(datF,advanceF)
 
 
 print(Sys.time())
-linEff <- jags.parallel(jagsDatFLin,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=4000,n.thin=4)
-save(list=ls(),file=paste0('~/Google Drive/CTmodels/fakeModels/linEff',Sys.Date(),'.RData'));rm(linEff);gc()
+linEff <- stan('~/gitRepos/ctaiAdvance/psmod.stan',data=sdatFlin,iter=3000,chains=6)
+save(linEff,sdatFlin,file='fittedModels/linEff.RData')
+print(Sys.time())
+
+
 
 
 ########### quadratic effects
-jagsDatFQuad <- within(jagsDatF,{
-  te <- -(U-mean(U))^2
-  te <- te/sd(te)*0.1
-  te <- te-mean(te)+0.18
-  Y[Z==1] <- Y[Z==1]+te
- }
-)
+datF$Y <- datF$Yorig
+datF <- within(datF,{
+    te <- -(U-mean(U))^2
+    te <- te/sd(te)*0.1
+    te <- te-mean(te)+0.13
+    Y[treatment==1] <- Y[treatment==1]+te[treatment==1]
+})
+
+sdatFquad <- makeStanDat(datF,advanceF)
+
 
 print(Sys.time())
-quadEff <- jags.parallel(jagsDatFQuad,parameters=params,model.file='src/psmod.bug',n.chains=4,n.iter=4000,n.thin=4)
+quadEff <- stan('~/gitRepos/ctaiAdvance/psmod.stan',data=sdatFquad,iter=3000,chains=6)
+save(quadEff,sdatFquad,file='fittedModels/quadEff.RData')
 print(Sys.time())
-save(list=ls(),file=paste0('~/Google Drive/CTmodels/fakeModels/quadEff',Sys.Date(),'.RData'));rm(quadEff);gc()
+
+
+
 

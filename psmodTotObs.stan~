@@ -26,9 +26,9 @@ data{
  real YtO[nstudTO];
  real YtM[nstudTM];
  real Yc[nstudC];
- vector[nstudTO] MbarTO;
- vector[nstudC] MbarC;
- vector[nstudTM] MbarTM;
+ vector<lower=0,upper=1>[nstudTO] MbarTO;
+ vector<lower=0,upper=1>[nstudC] MbarC;
+ vector<lower=0,upper=1>[nstudTM] MbarTM;
 
 
 }
