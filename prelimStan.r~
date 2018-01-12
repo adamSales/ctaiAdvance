@@ -1,26 +1,31 @@
 ### only look at year 2
 ### and only at students who weren't in  year 1
 library(splines)
-library(R2jags)
+library(rstan)
+library(dplyr)
 memory.limit(50000)
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
 
 #save(list=ls(),file=paste0('prev',Sys.time(),'.RData'))
 #rm(list=ls())
 
-load('../../data/RANDstudyData/HSdata.RData')
-load('../../data/sectionLevelUsageData/advanceData.RData')
+load('~/Box Sync/CT/data/RANDstudyData/HSdata.RData')
+load('~/Box Sync/CT/data/sectionLevelUsageData/advanceData.RData')
 
 
-### estimated eta using only treatment group
-library(jagstools)
-load('~/Google Drive/CTmodels/fullUsage.RData')
-usageMod <- mod
-U <- jagsresults(usageMod,'studEff')[,1]
+## ### estimated eta using only treatment group
+## library(jagstools)
+## load('~/Google Drive/CTmodels/fullUsage.RData')
+## usageMod <- mod
+## U <- jagsresults(usageMod,'studEff')[,1]
 
 
 dataPrep <- function(dat,advance,discard=TRUE){
  dat <- dat[!dat$field_id%in%dat$field_id[dat$year==1],]
- table(dat$year)
+ print(table(dat$year))
 
  dat <- droplevels(dat)
 ### look at promotion
@@ -67,65 +72,46 @@ dataPrep <- function(dat,advance,discard=TRUE){
 
  if(discard) advance <- subset(advance,section%in%aaa$section[aaa$n>100 & aaa$x<1] & year==2)
 
+ advance <- advance%>%group_by(field_id,section)%>%summarize(grad=max(grad,na.rm=TRUE))
+
  advance <- droplevels(advance)
  dat <- droplevels(dat)
 
  list(dat=dat,advance=advance)
 }
 
-makeJagsDat <- function(dat,advance){
+makeStanDat <- function(dat,advance,xInteract=FALSE){
+ stanDat <- list()
  advance <- droplevels(advance)
  dat <- droplevels(dat)
 
 
- dat$sid <- 1:nrow(dat)
+ stanDat$nsecWorked <- nrow(advance)
+ stanDat$nstud <- nrow(dat)
+ stanDat$nteacher <- nlevels(dat$teachid2)
+ stanDat$nschool <- nlevels(dat$schoolid2)
+ stanDat$nsec <- nlevels(advance$section)
+ stanDat$npair <- nlevels(dat$pair)
 
- nsecWorked <- nrow(advance)
- grad <- advance$grad
- sid <- dat$sid
- names(sid) <- dat$field_id
- studentM <- sid[as.character(advance$field_id)]
- nstud <- max(sid)
- stopifnot(nstud==length(unique(dat$field_id)))
- section <- as.numeric(as.factor(advance$section))
- nsec <- max(section)
- stopifnot(nsec==length(unique(advance$section)))
+ stanDat$teacher <- as.numeric(as.factor(dat$teachid2))
+ stanDat$pair <- as.numeric(dat$pair)
+ stanDat$school <- as.numeric(dat$school)
+ stanDat$studentM <- seq(stanDat$nstud)[match(advance$field_id,dat$field_id)]
+ stanDat$section <- as.numeric(advance$section)
 
+ stanDat$grad <- as.numeric(advance$grad)
 
  X <- model.matrix(~poly(xirt,2)+race+sex+spec+state,data=dat)[,-1]
- X <- scale(X)
- ncovar <- ncol(X)
+ if(xInteract) X <- model.matrix(~poly(xirt,2)*(race+sex+spec)+(race+sex+spec)^2+state,data=dat)[,-1]
+ stanDat$X <- scale(X)
+ stanDat$ncov <- ncol(X)
 
- teacher <- as.numeric(as.factor(dat$teachid2))
- ntch <- max(teacher)
- stopifnot(ntch==length(unique(dat$teachid2)))
 
- Z <- as.numeric(dat$treatment)
+ stanDat$Z <- as.numeric(dat$treatment)
 
- Xm <- colMeans(X)
+ stanDat$Y <- dat$Y
 
- school <- as.numeric(as.factor(dat$schoolid2))
- school <- vapply(1:ntch,function(i) school[teacher==i][1],1)
- nscl <- max(school)
- stopifnot(nscl==length(unique(dat$schoolid2)))
-
- Y <- dat$Y
-
- unit <- as.numeric(as.factor(advance$unit))
- unit <- vapply(1:nsec,function(i) unit[section==i][1],1)
- nunit <- max(unit)
- stopifnot(nunit==length(unique(advance$unit)))
- ### pair fixed effects
- pair <- as.numeric(dat$pair)
- npair <- max(pair)
- stopifnot(npair==length(unique(dat$pair)))
-
- xirt <- dat$xirt
-
- jagsDat <- list(nsecWorked,grad,studentM,section,X,teacher,Z,Xm,school,nstud,Y,ntch,nscl,nsec,unit,nunit,ncovar,pair,npair,xirt)
- names(jagsDat) <- c('nsecWorked','grad','studentM','section','X','teacher','Z','Xm','school','nstud','Y','ntch','nscl','nsec','unit','nunit','ncovar','pair','npair','xirt')
-
- jagsDat
+ stanDat
 }
 
 totDat <- dataPrep(dat,advance)
@@ -135,5 +121,7 @@ dat <- totDat$dat
 advance <- totDat$advance
 rm(totDat);gc()
 
-params <- c('studEff','secEff','alphaGrad','betaU','teacherEffU','Ynew','sig2Y','useEff','trtEff','betaY','teacherEffY','Ustd','a','b','sig2TchU','sig2TchY','sig2SclU','sig2SclY','sig2Sec','sig2Un','sig2U','pairEffect','sdSeff','avgSeff','a0','a1','a2','a3','b0','b1','b2','b3','nu.x','nu.u','nu.y','nu.tchu','nu.tchy','nu.sclu','nu.scly','nu.sec','lambda')
+sdat <- makeStanDat(dat,advance)
+
+
 
