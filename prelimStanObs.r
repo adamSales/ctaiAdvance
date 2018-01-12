@@ -69,6 +69,9 @@ dataPrepObs <- function(dat,advance,discard=TRUE){
 
  if(discard) advance <- subset(advance,section%in%aaa$section[aaa$n>100 & aaa$x<1] & year==2)
 
+ ## delete duplicate sections
+ advance <- advance%>%group_by(field_id,section)%>%summarize(grad=min(grad,na.rm=TRUE))
+
  advance <- droplevels(advance)
  dat <- droplevels(dat)
 
