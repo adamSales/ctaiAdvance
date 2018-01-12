@@ -94,7 +94,7 @@ plotDat <- data.frame(nsec=nsec,eta=eta,mDiff=mDiff$x,etasd=etasd)
 tikz(file='etaSampleSize.tex',
      standAlone=T,
      width=6,height=6)
-ggplot(plotDat,aes(eta,nsec,size=1/etasd))+geom_point()+xlab('$n_{sec}$')+labs(size='$1/\\text{SE}(\\eta_T)$')+scale_size(range=c(.5,2))+guides(size=FALSE)+ylab('$\\eta$')+ggtitle('One Posterior Draw')#+xlab('$\\mathbb{E}\\eta$')
+ggplot(plotDat,aes(nsec,eta,size=1/etasd))+geom_point()+ylab('$n_{sec}$')+labs(size='$1/\\text{SE}(\\eta_T)$')+scale_size(range=c(.5,2))+guides(size=FALSE)+xlab('$\\eta_T$')+ggtitle('One Posterior Draw')#+xlab('$\\mathbb{E}\\eta$')
 dev.off()
 tools::texi2dvi('etaSampleSize.tex', pdf = T, clean = T)
 
