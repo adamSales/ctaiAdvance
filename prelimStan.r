@@ -2,6 +2,7 @@
 ### and only at students who weren't in  year 1
 library(splines)
 library(rstan)
+library(dplyr)
 memory.limit(50000)
 
 rstan_options(auto_write = TRUE)
@@ -21,7 +22,6 @@ load('~/Box Sync/CT/data/sectionLevelUsageData/advanceData.RData')
 ## usageMod <- mod
 ## U <- jagsresults(usageMod,'studEff')[,1]
 
-
 dataPrep <- function(dat,advance,discard=TRUE){
  dat <- dat[!dat$field_id%in%dat$field_id[dat$year==1],]
  print(table(dat$year))
@@ -35,9 +35,12 @@ dataPrep <- function(dat,advance,discard=TRUE){
  advance <- advance[advance$field_id%in%dat$field_id[dat$treatment==1],]
 
  ### just look at algebra I sections--- likely different advance patterns in other curricula
- ### make sure to keep algebra i units that are also part of other curricula
+### make sure to keep algebra i units that are also part of other curricula
  algUnit <- unique(advance$unit[advance$curriculum=='algebra i'])
  advance <- subset(advance,unit%in%algUnit)
+
+### take out bridge to algebra, algebra ii, geometry
+ advance <- advance[-grep('ii|geo|bridge',advance$curriculum),]
 
  advance$grad <- advance$status=='graduated'
 
@@ -70,6 +73,8 @@ dataPrep <- function(dat,advance,discard=TRUE){
  aaa$n <- as.vector(table(advance$section))
 
  if(discard) advance <- subset(advance,section%in%aaa$section[aaa$n>100 & aaa$x<1] & year==2)
+
+ advance <- advance%>%group_by(field_id,section)%>%summarize(grad=min(grad,na.rm=TRUE))
 
  advance <- droplevels(advance)
  dat <- droplevels(dat)
