@@ -44,14 +44,16 @@ datF$teachid2 <- factor(datF$teachid2)
 advanceF <- advance[advance$field_id%in%datF$field_id[datF$treatment==1],]
 
 #########################################################
-### Compile JAGS data as before
+### Compile Stan data as before
 #####################################################
 sdatF <- makeStanDat(datF,advanceF)
 
-print(Sys.time())
+
 noEff <- stan('~/gitRepos/ctaiAdvance/psmod.stan',data=sdatF,iter=3000,chains=6)
-print(Sys.time())
-save(list=ls(),file='fittedModels/noEffect.RData')
+
+cat('\n\n\n\n',rep('-',40),'\n','TRUTH: NO EFFECT\n',rep('-',40),'\n\n\n')
+print(noEff,c('a0','a1','b0','b1'),c(0.05,0.95))
+save(list=ls(),file='fittedModels/noEffect.RData'); rm(noEff); gc()
 
 
 
@@ -64,9 +66,10 @@ sdatFConst <- within(sdatF,{
  }
 )
 
-print(Sys.time())
 constEff <- stan('~/gitRepos/ctaiAdvance/psmod.stan',data=sdatFConst,iter=3000,chains=6)
 
+cat('\n\n\n\n',rep('-',40),'\n','TRUTH: CONSTANT EFFECT ATE=0.18\n',rep('-',40),'\n\n\n')
+print(constEff,c('a0','a1','b0','b1'),c(0.05,0.95))
 save(constEff,sdatF,file='fittedModels/constEff.RData')
 
 
@@ -75,37 +78,43 @@ save(constEff,sdatF,file='fittedModels/constEff.RData')
 ##################################
 ######### linear effect ##########
 ##################################
-datF$te <- mean(effs$b0)+mean(effs$b1)*datF$U
-datF$Yorig <- datF$Y
-datF$Y[datF$treatment==1] <- datF$Y[datF$treatment==1]+datF$te[datF$treatment==1]
+datLin <- datF
+datLin$te <- mean(effs$b0)+mean(effs$b1)*datF$U
+datLin$Y[datLin$treatment==1] <- datLin$Y[datLin$treatment==1]+datLin$te[datLin$treatment==1]
 
-sdatFlin <- makeStanDat(datF,advanceF)
+sdatFlin <- makeStanDat(datLin,advanceF)
 
-
-print(Sys.time())
 linEff <- stan('~/gitRepos/ctaiAdvance/psmod.stan',data=sdatFlin,iter=3000,chains=6)
-save(linEff,sdatFlin,file='fittedModels/linEff.RData')
-print(Sys.time())
+cat('\n\n\n\n',rep('-',40),'\n','TRUTH: LINEAR EFFECT b1=',round(mean(effs$b1),2),'\n',rep('-',40),'\n\n\n')
+print(linEff,c('a0','a1','b0','b1'),c(0.05,0.95))
+
+save(linEff,sdatFlin,file='fittedModels/linEff.RData');rm(linEff);gc();
+
 
 
 
 
 ########### quadratic effects
-datF$Y <- datF$Yorig
-datF <- within(datF,{
+datQuad <- within(datF,{
     te <- -(U-mean(U))^2
     te <- te/sd(te)*0.1
     te <- te-mean(te)+0.13
     Y[treatment==1] <- Y[treatment==1]+te[treatment==1]
 })
 
-sdatFquad <- makeStanDat(datF,advanceF)
+sdatFquad <- makeStanDat(datQuad,advanceF)
 
 
-print(Sys.time())
+
 quadEff <- stan('~/gitRepos/ctaiAdvance/psmod.stan',data=sdatFquad,iter=3000,chains=6)
-save(quadEff,sdatFquad,file='fittedModels/quadEff.RData')
-print(Sys.time())
+
+cat('\n\n\n\n',rep('-',40),'\n','TRUTH: QUADRATIC EFFECT',rep('-',40),'\n\n\n')
+print(constEff,c('a0','a1','b0','b1'),c(0.05,0.95))
+
+
+
+save(quadEff,sdatFquad,file='fittedModels/quadEff.RData'); rm(quadEff); gc();
+
 
 
 

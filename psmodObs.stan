@@ -43,14 +43,14 @@ parameters{
  real teacherEffY[nteacher];
  real teacherEffU[nteacher];
  real pairEffect[npair];
- real schoolEffU[nschool];
+ //real schoolEffU[nschool];
  real schoolEffY[nschool];
 
  real<lower=0> sigTchY;
  real<lower=0> sigSclY;
  real<lower=0> sigY[2];
  real<lower=0> sigTchU;
- real<lower=0> sigSclU;
+ //real<lower=0> sigSclU;
  real<lower=0> sigU;
 
  vector<lower=0,upper=1>[nstudC] MbarC;
@@ -67,18 +67,18 @@ model{
 
  for(i in 1:nstudTO){
   muYtO[i]=teacherEffY[teacherTO[i]]+schoolEffY[schoolTO[i]]+pairEffect[pairTO[i]]+a0+b0+(a1+b1)*MbarTO[i];
-  muUtO[i]=teacherEffU[teacherTO[i]]+schoolEffU[schoolTO[i]];
+  muUtO[i]=teacherEffU[teacherTO[i]];//+schoolEffU[schoolTO[i]];
  }
 
  for(i in 1:nstudTM){
   muYtM[i]=teacherEffY[teacherTM[i]]+schoolEffY[schoolTM[i]]+pairEffect[pairTM[i]]+a0+b0+(a1+b1)*MbarTM[i];
-  muUtM[i]=teacherEffU[teacherTM[i]]+schoolEffU[schoolTM[i]];
+  muUtM[i]=teacherEffU[teacherTM[i]];//+schoolEffU[schoolTM[i]];
  }
 
 
  for(i in 1:nstudC){
   muYc[i]=teacherEffY[teacherC[i]]+schoolEffY[schoolC[i]]+pairEffect[pairC[i]]+a0+a1*MbarC[i];
-  muUc[i]=teacherEffU[teacherC[i]]+schoolEffU[schoolC[i]];
+  muUc[i]=teacherEffU[teacherC[i]];//+schoolEffU[schoolC[i]];
  }
 
  //priors
@@ -93,7 +93,7 @@ model{
 
 
  schoolEffY~normal(0,sigSclY);
- schoolEffU~normal(0,sigSclU);
+ //schoolEffU~normal(0,sigSclU);
  teacherEffU~normal(0,sigTchU);
  teacherEffY~normal(0,sigTchY);
 
