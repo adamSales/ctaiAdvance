@@ -4,15 +4,11 @@ getOption( "tikzLatexPackages" ),
 "\\usepackage{amsmath,amsfonts}"
 ))
 
+draw <- 1000
 
 source('~/gitRepos/ctaiAdvance/prelimStanObs.r')
 if(!exists('mod') |!exists('sdatObs')) pload('fittedModels/mbarModel.RData')
 
-sdatObs <- sdat
-datObs <- dat
-advObs <- advance
-
-draw <- 1000
 
 samps <- extract(mod)
 plotDatObs <- with(sdatObs,data.frame(Y=c(YtO,YtM,Yc),mbar=c(MbarTO,samps$MbarTM[draw,],samps$MbarC[draw,]),Z=c(rep(1,nstudTO),rep(1,nstudTM),rep(0,nstudC))))
@@ -25,7 +21,7 @@ plotDatObs <- within(plotDatObs, int <- int-( mean(int+slope*mbar)-mean(plotDatO
 
 tikz(file = "mbarModel.tex",
   standAlone = T,
-  width  = 6, height  = 6)
+  width  = 3, height  = 3)
 ggplot(plotDatObs,aes(mbar,Y,fill=treat,group=treat,color=treat))+geom_point(alpha=.5)+#alpha=.2,size=0.5)+
 #                                        geom_smooth(method='lm',se=F,size=2)+
     geom_abline(aes(intercept=int,slope=slope,color=treat),size=3)+
@@ -52,18 +48,21 @@ for(i in 1:nrow(mult)){
     }
 }
 
+
+
 tikz(file='mbarSampleSize.tex',
      standAlone=T,
-     width=6,height=6)
-ggplot(datObs,aes(nsecJ,mbarJ))+geom_point()+ylab('$\\bar{m}$')+xlab('$n_{sec}$')
+     width=3,height=3)
+ggplot(datObs,aes(mbarJ,nsecJ))+geom_point()+xlab('$\\bar{m}$')+ylab('$n_{sec}$')+theme(text=element_text(size=20))
 dev.off()
 tools::texi2dvi('mbarSampleSize.tex', pdf = T, clean = T)
 
 
-if(!exists('main')) pload('fittedModels/stanMod.RData')
-sdatLat <- sdat
-datLat <- dat
-
+if(!exists('main')){
+    pload('fittedModels/stanMod.RData')
+    sdatLat <- sdat
+    datLat <- dat
+}
 
 #secDiff <- colMeans(extract(main,'secEff')[[1]])
 secDiff <- -extract(main,'secEff')[[1]][draw,]
@@ -76,8 +75,9 @@ mbarDiffDat <- data.frame(mbar=mbar$x,mDiff=mDiff$x)
 
 tikz(file='mbarDiff.tex',
      standAlone=T,
-     width=6,height=6)
-ggplot(mbarDiffDat,aes(mbar,mDiff))+geom_point()+xlab('$\\bar{m}$')+ylab('Avg. Section Difficulty')
+     width=3,height=3)
+ggplot(mbarDiffDat,aes(mbar,mDiff))+geom_point()+xlab('$\\bar{m}$')+ylab('Avg. Sec. Difficulty')+
+    theme(text=element_text(size=20))
 dev.off()
 tools::texi2dvi('mbarDiff.tex', pdf = T, clean = T)
 
@@ -93,16 +93,27 @@ plotDat <- data.frame(nsec=nsec,eta=eta,mDiff=mDiff$x,etasd=etasd)
 
 tikz(file='etaSampleSize.tex',
      standAlone=T,
-     width=6,height=6)
-ggplot(plotDat,aes(nsec,eta,size=1/etasd))+geom_point()+ylab('$n_{sec}$')+labs(size='$1/\\text{SE}(\\eta_T)$')+scale_size(range=c(.5,2))+guides(size=FALSE)+xlab('$\\eta_T$')+ggtitle('One Posterior Draw')#+xlab('$\\mathbb{E}\\eta$')
+     width=3,height=3)
+ggplot(plotDat,aes(eta,nsec,size=1/etasd))+geom_point()+ylab(NULL)+#ylab('$n_{sec}$')+
+    labs(size='$1/\\text{SE}(\\eta_T)$')+scale_size(range=c(.5,2))+guides(size=FALSE)+xlab('$\\eta_T$')+
+    theme(text=element_text(size=20))+
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())#+ggtitle('One Posterior Draw')#+xlab('$\\mathbb{E}\\eta$')
 dev.off()
 tools::texi2dvi('etaSampleSize.tex', pdf = T, clean = T)
 
 
 tikz(file='etaDiff.tex',
      standAlone=T,
-     width=6,height=6)
-ggplot(plotDat,aes(mDiff,eta,size=1/etasd))+geom_point()+xlab('$Avg. Section Difficulty$')+labs(size='$1/\\text{SE}(\\eta_T)$')+scale_size(range=c(.5,2))+guides(size=FALSE)+ylab('$\\eta$')
+     width=3,height=3)
+ggplot(plotDat,aes(eta,mDiff,size=1/etasd))+geom_point()+#ylab('$Avg. Section Difficulty$')+
+    labs(size='$1/\\text{SE}(\\eta_T)$')+scale_size(range=c(.5,2))+guides(size=FALSE)+xlab('$\\eta_T$')+
+    theme(text=element_text(size=20))+
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())#+ggtitle('One Posterior Draw')#+xlab('$\\mathbb{E}\\eta$')
 dev.off()
 tools::texi2dvi('etaDiff.tex', pdf = T, clean = T)
+
 
