@@ -124,11 +124,11 @@ makeStanDatObs <- function(dat){
  stanDat
 }
 
-datOrig <- dat
-dat <- dataPrepObs(dat,advance)
+datObs <- dataPrepObs(dat,advance)
 
-sdat <- makeStanDatObs(dat)
+sdatObs <- makeStanDatObs(datObs)
 
 #NOT RUN:
 #mod <- stan('~/gitRepos/ctaiAdvance/psmodObs.stan',data=sdat); save(mod,sdat,file='fittedModels/mbarModel.RData')
 #printStan(mod)
+
