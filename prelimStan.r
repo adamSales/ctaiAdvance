@@ -24,7 +24,7 @@ load('~/Box Sync/CT/data/sectionLevelUsageData/advanceData.RData')
 
 dataPrep <- function(dat,advance,discard=TRUE){
  dat <- dat[!dat$field_id%in%dat$field_id[dat$year==1],]
- print(table(dat$year))
+ #print(table(dat$year))
 
  dat <- droplevels(dat)
 ### look at promotion
